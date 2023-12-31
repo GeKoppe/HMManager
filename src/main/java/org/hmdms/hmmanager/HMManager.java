@@ -10,7 +10,8 @@ public final class HMManager {
         logger.info("Starting application");
 
         TaskManager tm = new TaskManager();
-        tm.run();
+        Thread tmThread = new Thread(tm);
+        tmThread.start();
 
         logger.info("Exiting application");
     }
