@@ -1,16 +1,14 @@
 package org.hmdms.hmmanager.tasks;
 
+import org.hmdms.hmmanager.db.DBConnection;
+import org.hmdms.hmmanager.db.DBConnectionFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-
 public class UploadTask extends Task {
     private final Logger logger = LoggerFactory.getLogger(UploadTask.class);
-    private final List<String> keys = new ArrayList<String>();
-
+    private String sqlStatement;
+    private final DBConnection conn = DBConnectionFactory.newDefaultConnection();
     public UploadTask() {
         this.logger.debug("Instanciated new UploadTask");
     }
