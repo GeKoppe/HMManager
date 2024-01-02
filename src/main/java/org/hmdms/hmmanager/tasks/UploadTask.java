@@ -17,4 +17,9 @@ public class UploadTask extends Task {
 
         return true;
     }
+
+    @Override
+    public void answer() {
+        this.logger.debug("Answering message from message queue");
+    }
 }
