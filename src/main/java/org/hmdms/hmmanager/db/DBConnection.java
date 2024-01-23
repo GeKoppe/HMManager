@@ -7,6 +7,7 @@ import javax.xml.transform.Result;
 import java.io.InputStream;
 import java.sql.*;
 import java.util.Arrays;
+import java.util.Objects;
 import java.util.Properties;
 
 public class DBConnection {
@@ -173,6 +174,19 @@ public class DBConnection {
 
     public Connection getConn() {
         return conn;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        DBConnection that = (DBConnection) o;
+        return Objects.equals(getConnString(), that.getConnString()) && Objects.equals(getUser(), that.getUser());
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(getConnString(), getUser());
     }
 
     /**
