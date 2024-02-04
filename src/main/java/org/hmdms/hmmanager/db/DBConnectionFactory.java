@@ -39,10 +39,10 @@ public class DBConnectionFactory {
      * @return Object for database connection to given
      */
     @Contract(pure = true)
-    public static DBConnection newConnection(String jdbc, String user, String pw) {
+    public static DBConnection newConnection(String jdbc, String user, String pw, String dbName) {
         DBConnection conn;
         try {
-            conn = new DBConnection(jdbc, user, pw);
+            conn = new DBConnection(jdbc, user, pw, dbName);
             logger.debug("Instanciated DBConnection " + conn);
         } catch (Exception ex) {
             logger.info(ex.getClass().getName() + " during instanciation in method newDefaultConnection: " + ex.getMessage());
@@ -60,6 +60,6 @@ public class DBConnectionFactory {
     @Contract("_ -> new")
     public static @NotNull DBConnection cloneConnection(@NotNull DBConnection conn) {
         logger.debug("Cloning connection " + conn);
-        return new DBConnection(conn.getConnString(), conn.getUser(), conn.getPw());
+        return new DBConnection(conn.getConnString(), conn.getUser(), conn.getPw(), conn.getDbName());
     }
 }

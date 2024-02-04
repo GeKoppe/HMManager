@@ -13,7 +13,7 @@ public class DBConnectionFactoryTest {
 
     @Test
     public void testCustomConn() {
-        assertNotNull(DBConnectionFactory.newConnection("Hello World", "Test", "123"));
+        assertNotNull(DBConnectionFactory.newConnection("Hello World", "Test", "123", "test"));
     }
     @Test
     public void testClone() {

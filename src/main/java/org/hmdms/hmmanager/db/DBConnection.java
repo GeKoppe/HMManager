@@ -3,7 +3,6 @@ package org.hmdms.hmmanager.db;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.xml.transform.Result;
 import java.io.InputStream;
 import java.sql.*;
 import java.util.Arrays;
@@ -23,6 +22,8 @@ public class DBConnection {
      * Password for connecting to the database with user in user
      */
     private String pw;
+
+    private final String url;
     /**
      * Logger
      */
@@ -32,6 +33,8 @@ public class DBConnection {
      */
     private Connection conn;
     private String query;
+
+    private String dbName;
 
     /**
      * Instanciates class with params for connection to default database of the application.
@@ -46,9 +49,10 @@ public class DBConnection {
             }
             Properties props = new Properties();
             props.load(input);
-            this.connString = props.getProperty("db.url");
+            this.url = props.getProperty("db.url");
             this.user = props.getProperty("db.user");
             this.pw = props.getProperty("db.pw");
+            this.dbName = props.getProperty("db.name");
         } catch (Exception ex) {
             this.logger.debug(ex.getClass().getName() + " during instanciation of DBConnection: " + ex.getMessage());
             throw ex;
@@ -57,14 +61,15 @@ public class DBConnection {
 
     /**
      * Instanciates custom database connection
-     * @param jdbc Connection string to databse
-     * @param user User for databse connection
+     * @param jdbc Connection string to database
+     * @param user User for database connection
      * @param pw Password for database connection
      */
-    public DBConnection(String jdbc, String user, String pw) {
-        this.connString = jdbc;
+    public DBConnection(String jdbc, String user, String pw, String dbName) {
+        this.url = jdbc;
         this.user = user;
         this.pw = pw;
+        this.dbName = dbName;
     }
 
     /**
@@ -73,6 +78,7 @@ public class DBConnection {
      */
     public boolean connect() {
         try {
+            if (this.connString == null) this.buildConnString();
             this.conn = DriverManager.getConnection(this.connString);
             logger.debug("Connected to database");
         } catch (Exception ex) {
@@ -81,6 +87,18 @@ public class DBConnection {
             return false;
         }
         return true;
+    }
+
+    private void buildConnString() {
+        logger.debug("Instanciating connection String to database");
+        String qb = this.url +
+                "/" +
+                this.dbName +
+                "?user=" +
+                this.user +
+                "&password=" +
+                this.pw;
+        this.connString = qb;
     }
 
     /**
@@ -95,22 +113,59 @@ public class DBConnection {
             this.logger.debug("Tried to disconnect from a database to which no connection exists");
             throw new IllegalStateException("No connection to database established, cannot disconnect");
         }
-        this.conn.commit();
+        // this.conn.commit();
         this.conn.close();
         this.logger.debug("Closed connection to database");
         return true;
     }
 
+    public ResultSet executeQuery(String query) throws SQLException, NullPointerException, IllegalArgumentException {
+        this.setQuery(query);
+        ResultSet rs =  this.executeQuery();
+        this.disconnect();
+        return rs;
+    }
+
+    public int executeUpdate(String query) throws SQLException {
+        this.setQuery(query);
+        int rs =  this.executeUpdate();
+        this.disconnect();
+        return rs;
+    }
+
+    public int executeUpdate() throws SQLException {
+        if (this.query == null || this.query.isEmpty()) {
+            this.logger.debug("Cannot execute empty query in class in Object" + this);
+            throw new IllegalArgumentException("Query is either empty or null, must be initialized");
+        }
+
+        if (this.conn == null && !this.connect()) {
+            this.logger.debug("Cannot connect to database");
+            throw new NullPointerException("Connection is null");
+        }
+
+        int result;
+
+        try (Statement st = this.conn.createStatement()) {
+            result = st.executeUpdate(this.query);
+        } catch (Exception ex) {
+            this.logger.info(ex.getClass().getName() + " in " + this + ": " + ex.getMessage());
+            this.logger.debug(Arrays.toString(ex.getStackTrace()));
+            throw ex;
+        }
+        return result;
+    }
+
     /**
      *
-     * @return
-     * @throws SQLException
-     * @throws NullPointerException
-     * @throws IllegalArgumentException
+     * @return Result of the query
+     * @throws SQLException If exception happens during update
+     * @throws NullPointerException When there is no connection object for db connection or cannot connect
+     * @throws IllegalArgumentException When an empty query is given
      */
     public ResultSet executeQuery() throws SQLException, NullPointerException, IllegalArgumentException {
-        if (this.query == null || this.query.equals("")) {
-            this.logger.debug("Cannot execute empty query in class in Object" + this);
+        if (this.query == null || this.query.isEmpty()) {
+            this.logger.debug("Cannot execute empty query in class in Object " + this);
             throw new IllegalArgumentException("Query is either empty or null, must be initialized");
         }
 
@@ -131,21 +186,6 @@ public class DBConnection {
         }
         this.conn.close();
         return rs;
-    }
-
-    /**
-     *
-     * @param query Query to be executed
-     * @return
-     * @throws SQLException
-     * @throws NullPointerException
-     * @throws IllegalArgumentException
-     */
-    public ResultSet executeQuery(String query) throws SQLException, NullPointerException, IllegalArgumentException {
-        this.setQuery(query);
-        ResultSet rs;
-
-        return this.executeQuery();
     }
 
     public String getConnString() {
@@ -189,22 +229,6 @@ public class DBConnection {
         return Objects.hash(getConnString(), getUser());
     }
 
-    /**
-     * @return String representation of class instance
-     */
-    @Override
-    public String toString() {
-        return new StringBuilder().
-                append("DBConnection{").
-                append("connString='").
-                append(connString).
-                append('\'').
-                append(", user='").
-                append(user).
-                append('\'').
-                append('}').
-                toString();
-    }
 
     public String getQuery() {
         return query;
@@ -212,5 +236,13 @@ public class DBConnection {
 
     public void setQuery(String query) {
         this.query = query;
+    }
+
+    public String getDbName() {
+        return dbName;
+    }
+
+    public void setDbName(String dbName) {
+        this.dbName = dbName;
     }
 }

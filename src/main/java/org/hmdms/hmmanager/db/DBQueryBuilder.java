@@ -7,12 +7,15 @@ import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
+/**
+ *
+ */
 public class DBQueryBuilder {
 
     /**
      * Logger for the class
      */
-    private static Logger logger = LoggerFactory.getLogger(DBQueryBuilder.class);
+    private static final Logger logger = LoggerFactory.getLogger(DBQueryBuilder.class);
 
     /**
      * Builds a select SQL Query
@@ -23,7 +26,7 @@ public class DBQueryBuilder {
      */
     @Contract(pure = true)
     public static @NotNull String buildSelect(@NotNull String table, @NotNull LinkedList<QueryArgument> filters, @NotNull LinkedList<String> columns) {
-        logger.trace("Building select query with arguments: \ntable = " + table + ",\ncolumns = " + columns + ",\nfilters = " + filters);
+        logger.trace("Building select query with arguments: \n\ttable = " + table + ",\n\tcolumns = " + columns + ",\n\tfilters = " + filters);
         StringBuilder qb = new StringBuilder();
         qb.append("SELECT ");
 
@@ -31,15 +34,11 @@ public class DBQueryBuilder {
             if (i != 0L) {
                 qb.append(", ");
             }
-            qb.append("[")
-                    .append(columns.get((int) i))
-                    .append("]");
+            qb.append(columns.get((int) i));
         }
 
         qb.append(" FROM ")
-                .append("[")
-                .append(table)
-                .append("]");
+                .append(table);
 
         if (!filters.isEmpty()) {
             logger.debug("Setting filters");
@@ -47,6 +46,45 @@ public class DBQueryBuilder {
         }
         qb.append(";");
         logger.debug("Build query \"" + qb + "\"");
+        return qb.toString();
+    }
+
+    public static String buildUpdateQuery(@NotNull String table, @NotNull LinkedList<QueryArgument> updates, @NotNull LinkedList<QueryArgument> filters) {
+        StringBuilder qb = new StringBuilder();
+        logger.trace("Building update query for arguments:\n\ttable: " + table + "\n\tupdates: " + updates + "\n\tfilters: " + filters);
+        qb.append("UPDATE ")
+                .append(table)
+                .append(" SET ");
+
+        boolean firstSet = false;
+        for (var c : updates) {
+            logger.debug("Adding to update: " + c);
+            if (firstSet) qb.append(", ");
+            qb.append(c.getColumn())
+                    .append(" = ");
+            if (c.getType().compareTo(QueryArgumentTypes.DATETIME) <= 0) {
+                qb.append("'");
+            }
+
+            qb.append(c.getValue());
+
+            if (c.getType().compareTo(QueryArgumentTypes.DATETIME) <= 0) {
+                qb.append("'");
+            }
+            firstSet = true;
+        }
+        buildFilterString(filters, qb);
+        qb.append(";");
+        logger.debug("Finished updatestring: %s".formatted(qb));
+        return qb.toString();
+    }
+
+    public static String buildInsertQuery(@NotNull String table, @NotNull LinkedList<String> columns, @NotNull LinkedList<QueryArgument> inserts) {
+        logger.trace("Building insert query with arguments:\n\ttable: " + table + "\n\tinserts: " + inserts);
+        StringBuilder qb = new StringBuilder();
+        qb.append("INSERT INTO ")
+                .append(table)
+                .append(" (");
         return qb.toString();
     }
 
@@ -62,9 +100,7 @@ public class DBQueryBuilder {
         for (QueryArgument a : filters) {
             logger.debug("Setting filter " + a);
             if (firstSet) qb.append(" AND ");
-            qb.append("[")
-                    .append(a.getColumn())
-                    .append("]")
+            qb.append(a.getColumn())
                     .append(" = ");
 
             if (a.getType().compareTo(QueryArgumentTypes.DATETIME) <= 0) {
