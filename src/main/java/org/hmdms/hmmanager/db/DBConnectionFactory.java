@@ -23,9 +23,9 @@ public class DBConnectionFactory {
         DBConnection conn;
         try {
             conn = new DBConnection();
-            logger.debug("Instanciated DBConnection");
+            logger.debug("Instanced DBConnection");
         } catch (Exception ex) {
-            logger.info(ex.getClass().getName() + " during instanciation in method newDefaultConnection: " + ex.getMessage());
+            logger.info(ex.getClass().getName() + " during instantiation in method newDefaultConnection: " + ex.getMessage());
             conn = null;
         }
         return conn;
@@ -43,7 +43,7 @@ public class DBConnectionFactory {
         DBConnection conn;
         try {
             conn = new DBConnection(jdbc, user, pw, dbName);
-            logger.debug("Instanciated DBConnection " + conn);
+            logger.debug("Instanced DBConnection " + conn);
         } catch (Exception ex) {
             logger.info(ex.getClass().getName() + " during instanciation in method newDefaultConnection: " + ex.getMessage());
             logger.debug(Arrays.toString(ex.getStackTrace()));
