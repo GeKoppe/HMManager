@@ -7,11 +7,20 @@ import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 
+/**
+ * Factory class for Message Information
+ */
 public class MessageInfoFactory {
 
     private final Logger logger = LoggerFactory.getLogger(MessageInfoFactory.class);
+
+    /**
+     *
+     * @return A default MessageInfo object
+     */
     @Contract(" -> new")
     public static @NotNull MessageInfo createDefaultMessageInfo() {
         return new MessageInfo();
     }
+
 }

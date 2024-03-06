@@ -5,18 +5,18 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 
-public class TestObserver implements Observer {
+public class TestSubscriber implements ISubscriber {
 
-    private final Logger logger = LoggerFactory.getLogger(TestObserver.class);
-    private final String topic = "Test";
-    public TestObserver() {
+    private final Logger logger = LoggerFactory.getLogger(TestSubscriber.class);
+    private final TopicC topic = TopicC.TEST;
+    public TestSubscriber() {
 
     }
 
 
     @Override
-    public boolean notify(String topic) {
-        if (topic.equals(this.topic)) return true;
+    public boolean notify(TopicC topic) {
+        if (topic == this.topic) return true;
         return false;
     }
 
@@ -24,7 +24,7 @@ public class TestObserver implements Observer {
     public void giveMessages(ArrayList<MessageInfo> mi) {
         for (var info : mi) {
             logger.debug("Gotten new Message: " + info.toString());
-            System.out.println(info.toString());
+            System.out.println(info);
         }
     }
     @Override
@@ -32,7 +32,4 @@ public class TestObserver implements Observer {
         return true;
     }
 
-    public void receive(ArrayList<MessageInfo> mis) {
-
-    }
 }

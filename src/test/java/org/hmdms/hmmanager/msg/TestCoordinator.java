@@ -12,6 +12,7 @@ import static org.junit.Assert.*;
 public class TestCoordinator {
 
     private final Logger logger = LoggerFactory.getLogger(TestCoordinator.class);
+
     @Test
     public void instBrokerAmountByConfig() {
         try {
@@ -28,7 +29,7 @@ public class TestCoordinator {
         try {
             Coordinator co = new Coordinator();
             MessageInfo mi = MessageInfoFactory.createDefaultMessageInfo();
-            TestObserver t = new TestObserver();
+            TestSubscriber t = new TestSubscriber();
             for (var b : co.getBrokers()) {
                 b.addObserver(t);
             }
@@ -39,11 +40,47 @@ public class TestCoordinator {
             hm.put("Moin", "Welt");
             mi.setInformation(hm);
 
-            co.newMessage("Test", mi);
+            co.newMessage(TopicC.TEST, mi);
             assertTrue(true);
         } catch (Exception ex) {
             this.logger.info("Exception occurred in test addNewMessage: " + ex.getMessage());
             fail();
         }
     }
+
+    @Test
+    public void addMessageAndNotifySingle() {
+        try {
+            Coordinator co = new Coordinator();
+            MessageInfo mi = MessageInfoFactory.createDefaultMessageInfo();
+            TestSubscriber t = new TestSubscriber();
+            for (var b : co.getBrokers()) {
+                b.addObserver(t);
+            }
+            mi.setFrom("Me");
+
+            HashMap<String, String> hm = new HashMap<>();
+            hm.put("Hello", "World");
+            hm.put("Moin", "Welt");
+            mi.setInformation(hm);
+
+            co.newMessage(TopicC.TEST, mi);
+            for (var b : co.getBrokers()) {
+                b.notifyObservers(TopicC.LOGIN);
+            }
+
+            for (var b : co.getBrokers()) {
+                b.notifyObservers(TopicC.TEST);
+            }
+
+            for (var b : co.getBrokers()) {
+                b.notifyAllObservers();
+            }
+            assertTrue(true);
+        } catch (Exception ex) {
+            this.logger.info("Exception occurred in test addNewMessage: " + ex.getMessage());
+            fail();
+        }
+    }
+
 }

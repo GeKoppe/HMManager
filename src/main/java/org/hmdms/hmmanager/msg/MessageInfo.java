@@ -7,16 +7,43 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.UUID;
 
+/**
+ * Class that represents a message in the system
+ */
 public class MessageInfo {
 
+    /**
+     * Logger
+     */
     private final Logger logger = LoggerFactory.getLogger(MessageInfo.class);
+    /**
+     * ID of the message. {@link Broker} uses this to identify message
+     */
     private String uuid;
+    /**
+     * Date at which the message was received
+     */
     private Date received;
+    /**
+     * Where the message came from
+     */
     private String from;
+    /**
+     * Information in the message
+     */
     private HashMap<String,String> information;
+    /**
+     * Shows, whether the message was collected by a subscriber. Used by {@link Broker} class.
+     */
     private boolean collected;
+    /**
+     * Date when the message was collected
+     */
     private Date collectionDate;
 
+    /**
+     * Default Constructor
+     */
     public MessageInfo() {
         this.logger.debug("Empty MessageInfo Object");
 
@@ -28,6 +55,11 @@ public class MessageInfo {
         this.collected = false;
     }
 
+    /**
+     * Constructor for the MessageInfo object
+     * @param from Sender of the message
+     * @param information Information that is transported by the message
+     */
     public MessageInfo(String from, HashMap<String, String> information) {
         if (from == null || from.isEmpty()) throw new IllegalArgumentException("No sender given in from argument");
         if (information == null || information.isEmpty()) throw new IllegalArgumentException("No information about message given");
