@@ -7,6 +7,7 @@ import javax.jms.Message;
 import javax.jms.MessageListener;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.NotActiveException;
 import java.util.ArrayList;
 import java.util.Properties;
 
@@ -75,35 +76,61 @@ public class Coordinator implements Runnable {
     }
 
     /**
-     * Cleans up all messages in all brokers by calling their cleanup message
+     * Returns all brokers this coordinator coordinates
+     * @return All brokers of this coordinator
      */
-    public void cleanup() {
-        for (Broker b : this.brokers) {
-            ArrayList<MessageInfo> oldMessages = b.cleanup(this.messageTimeout);
-            this.logger.info(oldMessages.size() + " are being cleaned up");
-        }
-    }
-
     public ArrayList<Broker> getBrokers() {
         return this.brokers;
     }
 
+    /**
+     * Returns current state of this coordinator
+     * @return Current state
+     */
     public StateC getState() {
         return this.state;
     }
 
+    /**
+     * Sets state of the coordinator. Can be used to stop it from working by setting state to StateC.STOPPED
+     * @param state
+     */
     public void setState(StateC state) { this.state = state; }
 
+    /**
+     * Runs main logic of the coordinator. Can and should be run in a different thread
+     */
     @Override
     public void run() {
+        if (!this.state.equals(StateC.STARTED)) return;
         this.state = StateC.WORKING;
         while (this.state.equals(StateC.WORKING)) {
             for (Broker b : this.brokers) {
                 b.notifyAllSubscribers();
+                b.collectAnswersFromSubs();
                 ArrayList<MessageInfo> cleanedMessages = b.cleanup(this.messageTimeout);
             }
         }
 
+        this.logger.debug("Coordinator stopped");
         this.state = StateC.STOPPED;
+    }
+
+    /**
+     * Instantiates all brokers this coordinator coordinates
+     */
+    public void setup() {
+        this.logger.debug("Setting up coordinator");
+        this.logger.debug("Adding brokers");
+        for (int i = 0; i < this.numOfBrokers; i++) {
+            this.brokers.add(new Broker());
+        }
+
+
+        for (Broker b : this.brokers) {
+            b.addSubscriber(new TestSubscriber());
+        }
+        this.state = StateC.STARTED;
+        this.logger.debug("Coordinator is fully setup");
     }
 }

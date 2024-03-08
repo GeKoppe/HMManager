@@ -7,16 +7,27 @@ import java.util.ArrayList;
  * Interface that needs to be implemented by all Observers
  */
 public interface ISubscriber extends Runnable {
-
     /**
-     * Method is called when
-     * @param mi
-     * @return
+     * Gives the subscriber all new messages concerning their topic
+     * @param mi Messages
      */
     void notify(ArrayList<MessageInfo> mi);
+
+    /**
+     * Method used to check for the topic the subscriber subscribes to
+     * @return Topic of the subscriber
+     */
     TopicC getTopic();
 
+    /**
+     * Method used to check current State of the subscriber (is it working on something else, did it die etc.)
+     * @return State of the subscriber
+     */
     StateC getState();
 
+    /**
+     * Method used to collect all answers from the subscriber
+     * @return Answers the subscriber compiled
+     */
     ArrayList<MessageInfo> getAnswers();
 }

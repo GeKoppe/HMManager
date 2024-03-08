@@ -13,16 +13,23 @@ import java.util.LinkedList;
  * subscribe to this class
  */
 public class Broker {
+    /**
+     * Logger
+     */
     private final Logger logger = LoggerFactory.getLogger(Broker.class);
 
     /**
      * All messages, sorted by topic
      */
-    private HashMap<TopicC, LinkedList<MessageInfo>> mq;
+    private final HashMap<TopicC, LinkedList<MessageInfo>> mq;
     /**
-     * All observers that subscribe to this broker
+     * All subscribers that subscribe to this broker
      */
     private final ArrayList<ISubscriber> subscribers;
+    /**
+     * Answers collected from subscribers
+     */
+    private final ArrayList<MessageInfo> answers;
 
     private StateC state;
     public Broker () {
@@ -30,6 +37,7 @@ public class Broker {
         this.mq = new HashMap<>();
         this.subscribers = new ArrayList<>();
         this.state = StateC.STARTED;
+        this.answers = new ArrayList<>();
     }
 
     /**
@@ -53,8 +61,8 @@ public class Broker {
     }
 
     /**
-     * Notifies all observer of the given topic and gives them any uncollected messages for the given topic
-     * @param topic Topic for which the observers should be notified
+     * Notifies all subscribers of the given topic and gives them any uncollected messages for the given topic
+     * @param topic Topic for which the subscribers should be notified
      */
     public void notifySubscriber(TopicC topic) {
         this.state = StateC.WORKING;
@@ -62,9 +70,9 @@ public class Broker {
             this.logger.debug("Topic " + topic.name() + " does not currently exist in message queue");
             return;
         }
-        // Iterate through all observers
+        // Iterate through all subscribers
         for (ISubscriber o : this.subscribers) {
-            // If observer observes given topic, give them messages concerning the topic
+            // If subscriber subscribes given topic, give them messages concerning the topic
             if (o.getTopic().equals(topic) && o.getState().equals(StateC.STARTED)) {
                 try {
                     ArrayList<MessageInfo> mis = this.getUncollectedMessages(topic);
@@ -73,9 +81,9 @@ public class Broker {
                         m.setCollected(true);
                         m.setCollectionDate(new Date());
                     }
-                    this.logger.debug("Notified observers of new message");
+                    this.logger.trace("Notified subscribers of new message");
                 } catch (Exception ex) {
-                    this.logger.debug("Exception occurred while giving observer messages: " + ex.getMessage());
+                    this.logger.info("Exception occurred while giving subscribers messages: " + ex.getMessage());
                 }
             }
         }
@@ -83,7 +91,7 @@ public class Broker {
     }
 
     /**
-     * Method to notify all observers of all topics to get any not yet collected messages out
+     * Method to notify all subscribers of all topics to get any not yet collected messages out
      */
     public void notifyAllSubscribers() {
         for (TopicC topic : this.mq.keySet()) {
@@ -97,9 +105,9 @@ public class Broker {
                             m.setCollected(true);
                             m.setCollectionDate(new Date());
                         }
-                        this.logger.debug("Notified observers of new message");
+                        this.logger.trace("Notified subscribers of new message");
                     } catch (Exception ex) {
-                        this.logger.debug("Exception occurred while giving observer messages: " + ex.getMessage());
+                        this.logger.debug("Exception occurred while giving subscribers messages: " + ex.getMessage());
                     }
                 }
 
@@ -121,12 +129,12 @@ public class Broker {
     }
 
     /**
-     * Adds an observer that subscribes to this broker
-     * @param o Observer object
+     * Adds an subscriber that subscribes to this broker
+     * @param s subscriber object
      */
-    public void addObserver(ISubscriber o) {
-        this.subscribers.add(o);
-        this.logger.debug("Added observer " + o.toString());
+    public void addSubscriber(ISubscriber s) {
+        this.subscribers.add(s);
+        this.logger.debug("Added subscriber " + s.toString());
     }
 
     /**
@@ -141,9 +149,23 @@ public class Broker {
         for (TopicC t : this.mq.keySet()) {
             // Iterate through all messages in that topic
             for (MessageInfo m : this.mq.get(t)) {
-                // If message is older than timeoutSeconds, remove it from message queue and add it to the cleaned messages
-                if (((int) (new Date().getTime() - m.getReceived().getTime()) / 1000) > timeoutSeconds) {
-                    this.logger.info("Message " + m.toString() + " is being cleaned up as it has not finished after timeout");
+                // If message was already collected, check the collection date
+                if (m.isCollected()) {
+                    Date collectionDate = m.getCollectionDate();
+                    if (collectionDate == null) {
+                        m.setCollectionDate(new Date());
+                        continue;
+                    }
+
+                    // If collection date is longer ago than timeoutSeconds, remove the message from the queue
+                    if (((int) (new Date().getTime() - collectionDate.getTime()) / 1000) > timeoutSeconds) {
+                        this.logger.info("Message " + m + " is being cleaned up as it has not finished after timeout");
+                        cleaned.add(m);
+                        this.mq.get(t).remove(m);
+                    }
+                } else if (((int) (new Date().getTime() - m.getReceived().getTime()) / 1000) > timeoutSeconds) {
+                    // If the message has not been collected, check the received time instead
+                    this.logger.info("Message " + m + " is being cleaned up as it has not finished after timeout");
                     cleaned.add(m);
                     this.mq.get(t).remove(m);
                 }
@@ -154,4 +176,14 @@ public class Broker {
         return cleaned;
     }
 
+
+    /**
+     * Checks all subscribers for answers they compiled since last check. Adds those answers to
+     * the internal answers list of the broker
+     */
+    public void collectAnswersFromSubs() {
+        for (ISubscriber sub : this.subscribers) {
+            this.answers.addAll(sub.getAnswers());
+        }
+    }
 }

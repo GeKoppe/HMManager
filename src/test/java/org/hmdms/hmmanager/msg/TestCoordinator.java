@@ -30,9 +30,6 @@ public class TestCoordinator {
             Coordinator co = new Coordinator();
             MessageInfo mi = MessageInfoFactory.createDefaultMessageInfo();
             TestSubscriber t = new TestSubscriber();
-            for (var b : co.getBrokers()) {
-                b.addObserver(t);
-            }
             mi.setFrom("Me");
 
             HashMap<String, String> hm = new HashMap<>();
@@ -54,9 +51,6 @@ public class TestCoordinator {
             Coordinator co = new Coordinator();
             MessageInfo mi = MessageInfoFactory.createDefaultMessageInfo();
             TestSubscriber t = new TestSubscriber();
-            for (var b : co.getBrokers()) {
-                b.addObserver(t);
-            }
             mi.setFrom("Me");
 
             HashMap<String, String> hm = new HashMap<>();
@@ -88,22 +82,21 @@ public class TestCoordinator {
         try {
             Coordinator co = new Coordinator();
             MessageInfo mi = MessageInfoFactory.createDefaultMessageInfo();
-            TestSubscriber t = new TestSubscriber();
-            for (var b : co.getBrokers()) {
-                b.addObserver(t);
-            }
             mi.setFrom("Me");
 
             HashMap<String, String> hm = new HashMap<>();
             hm.put("Hello", "World");
             hm.put("Moin", "Welt");
             mi.setInformation(hm);
-
+            co.setup();
             Thread thread = new Thread(co);
             thread.start();
 
             co.newMessage(TopicC.LOGIN, mi);
-
+            co.newMessage(TopicC.TEST, mi);
+            Thread.sleep(12000);
+            co.setState(StateC.STOPPED);
+            Thread.sleep(1000);
         } catch (Exception ex) {
             this.logger.info("Exception occured in test testThreead: " + ex.getMessage());
             fail();

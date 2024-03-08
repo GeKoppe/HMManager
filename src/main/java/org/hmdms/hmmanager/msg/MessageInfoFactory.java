@@ -12,6 +12,9 @@ import java.util.HashMap;
  */
 public class MessageInfoFactory {
 
+    /**
+     * Logger
+     */
     private final Logger logger = LoggerFactory.getLogger(MessageInfoFactory.class);
 
     /**
