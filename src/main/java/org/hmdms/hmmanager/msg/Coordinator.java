@@ -3,6 +3,8 @@ package org.hmdms.hmmanager.msg;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.jms.Message;
+import javax.jms.MessageListener;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -12,7 +14,7 @@ import java.util.Properties;
  * Entry point for messages into the system. Receives messages from other components, distributes them among
  * {@link Broker} objects and coordinates answering the messages when the job is finished
  */
-public class Coordinator {
+public class Coordinator implements Runnable {
     /**
      * Current state of the coordinator
      */
@@ -88,5 +90,20 @@ public class Coordinator {
 
     public StateC getState() {
         return this.state;
+    }
+
+    public void setState(StateC state) { this.state = state; }
+
+    @Override
+    public void run() {
+        this.state = StateC.WORKING;
+        while (this.state.equals(StateC.WORKING)) {
+            for (Broker b : this.brokers) {
+                b.notifyAllSubscribers();
+                ArrayList<MessageInfo> cleanedMessages = b.cleanup(this.messageTimeout);
+            }
+        }
+
+        this.state = StateC.STOPPED;
     }
 }

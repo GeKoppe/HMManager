@@ -23,10 +23,13 @@ public class Broker {
      * All observers that subscribe to this broker
      */
     private final ArrayList<ISubscriber> subscribers;
+
+    private StateC state;
     public Broker () {
         logger.debug("Broker instantiated");
         this.mq = new HashMap<>();
         this.subscribers = new ArrayList<>();
+        this.state = StateC.STARTED;
     }
 
     /**
@@ -53,18 +56,19 @@ public class Broker {
      * Notifies all observer of the given topic and gives them any uncollected messages for the given topic
      * @param topic Topic for which the observers should be notified
      */
-    public void notifyObservers(TopicC topic) {
+    public void notifySubscriber(TopicC topic) {
+        this.state = StateC.WORKING;
         if (this.mq.get(topic) == null) {
             this.logger.debug("Topic " + topic.name() + " does not currently exist in message queue");
             return;
         }
         // Iterate through all observers
-        for (var o : this.subscribers) {
+        for (ISubscriber o : this.subscribers) {
             // If observer observes given topic, give them messages concerning the topic
-            if (o.notify(topic)) {
+            if (o.getTopic().equals(topic) && o.getState().equals(StateC.STARTED)) {
                 try {
                     ArrayList<MessageInfo> mis = this.getUncollectedMessages(topic);
-                    o.giveMessages(mis);
+                    o.notify(mis);
                     for (var m : mis) {
                         m.setCollected(true);
                         m.setCollectionDate(new Date());
@@ -75,19 +79,20 @@ public class Broker {
                 }
             }
         }
+        this.state = StateC.STARTED;
     }
 
     /**
      * Method to notify all observers of all topics to get any not yet collected messages out
      */
-    public void notifyAllObservers() {
-        for (var topic : this.mq.keySet()) {
-            for (var o : this.subscribers) {
-                // If observer observes given topic, give them messages concerning the topic
-                if (o.notify(topic)) {
+    public void notifyAllSubscribers() {
+        for (TopicC topic : this.mq.keySet()) {
+            for (ISubscriber o : this.subscribers) {
+                // If subscriber subscribes to given topic, give them messages concerning the topic
+                if (o.getTopic().equals(topic)) {
                     try {
                         ArrayList<MessageInfo> mis = this.getUncollectedMessages(topic);
-                        o.giveMessages(mis);
+                        o.notify(mis);
                         for (var m : mis) {
                             m.setCollected(true);
                             m.setCollectionDate(new Date());
@@ -124,9 +129,29 @@ public class Broker {
         this.logger.debug("Added observer " + o.toString());
     }
 
+    /**
+     * Cleans all messages that are older than {@param timeoutSeconds} seconds.
+     * @param timeoutSeconds Time in seconds after which messages are to be removed from the message queue
+     * @return All cleaned messages, because the coordinator still has to answer them
+     */
     public ArrayList<MessageInfo> cleanup(int timeoutSeconds) {
+        ArrayList<MessageInfo> cleaned = new ArrayList<>();
 
-        return new ArrayList<MessageInfo>();
+        // Iterate through all topics
+        for (TopicC t : this.mq.keySet()) {
+            // Iterate through all messages in that topic
+            for (MessageInfo m : this.mq.get(t)) {
+                // If message is older than timeoutSeconds, remove it from message queue and add it to the cleaned messages
+                if (((int) (new Date().getTime() - m.getReceived().getTime()) / 1000) > timeoutSeconds) {
+                    this.logger.info("Message " + m.toString() + " is being cleaned up as it has not finished after timeout");
+                    cleaned.add(m);
+                    this.mq.get(t).remove(m);
+                }
+            }
+        }
+
+        // Return all cleaned messages to the coordinator so it can answer
+        return cleaned;
     }
 
 }

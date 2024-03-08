@@ -1,23 +1,22 @@
 package org.hmdms.hmmanager.msg;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 
 /**
  * Interface that needs to be implemented by all Observers
  */
-public interface ISubscriber {
+public interface ISubscriber extends Runnable {
 
     /**
      * Method is called when
-     * @param topic
+     * @param mi
      * @return
      */
-    public boolean notify(TopicC topic);
-    public boolean getState(String id);
+    void notify(ArrayList<MessageInfo> mi);
+    TopicC getTopic();
 
-    /**
-     * Message for handling all new messages
-     * @param mi List of all message objects
-     */
-    public void giveMessages(ArrayList<MessageInfo> mi);
+    StateC getState();
+
+    ArrayList<MessageInfo> getAnswers();
 }
