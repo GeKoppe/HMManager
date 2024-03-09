@@ -4,10 +4,7 @@ import org.hmdms.hmmanager.core.StateC;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.LinkedList;
+import java.util.*;
 
 /**
  * This class manages all messages given to the system and gives them to their respective services, which in turn
@@ -81,21 +78,25 @@ public class Broker {
         }
         // Iterate through all subscribers
         for (ISubscriber sub : this.subscribers) {
+            ArrayList<MessageInfo> transmitted = new ArrayList<>();
             // If subscriber subscribes given topic, give them messages concerning the topic
             if (sub.getTopic().equals(topic) && sub.getState().equals(StateC.STARTED)) {
                 try {
                     // Get all messages that have not been collected yet and give them to subscriber
-                    ArrayList<MessageInfo> mis = this.getUncollectedMessages(topic);
+                    ArrayList<MessageInfo> mis = this.getUncollectedMessages(this.mq.get(topic));
                     sub.notify(mis);
 
                     // Mark all transferred messages as collected
-                    for (var m : mis) {
-                        m.setCollected(true);
-                        m.setCollectionDate(new Date());
-                    }
+                    transmitted.addAll(mis);
                     this.logger.trace("Notified subscribers of new message");
                 } catch (Exception ex) {
-                    this.logger.info("Exception occurred while giving subscribers messages: " + ex.getMessage());
+                    this.logger.debug("Exception occurred while giving subscribers messages: " + ex.getMessage());
+                    StringBuilder stack = new StringBuilder();
+                    for (var stel : ex.getStackTrace()) {
+                        stack.append(stel.toString());
+                        stack.append("\n");
+                    }
+                    this.logger.debug(stack.toString());
                 }
             }
         }
@@ -108,26 +109,44 @@ public class Broker {
     public void notifyAllSubscribers() {
         if (this.state.equals(StateC.WORKING)) return;
         this.state = StateC.WORKING;
-        for (TopicC topic : this.mq.keySet()) {
+
+        Set<TopicC> keySet = this.mq.keySet();
+        for (TopicC topic : keySet) {
+            ArrayList<MessageInfo> mis = new ArrayList<>();
+
+            if (this.mq.get(topic) == null || this.mq.get(topic).isEmpty()) {
+                continue;
+            }
             for (ISubscriber sub : this.subscribers) {
                 // If subscriber subscribes to given topic, give them messages concerning the topic
-                if (sub.getTopic().equals(topic) && sub.getState().equals(StateC.STARTED)) {
+                if (sub.getTopic().equals(topic)) {
                     try {
                         // Get all collected messages and give them to the subscriber
-                        ArrayList<MessageInfo> mis = this.getUncollectedMessages(topic);
-                        sub.notify(mis);
-
-                        // Mark all transferred messages as collected
-                        for (var m : mis) {
-                            m.setCollected(true);
-                            m.setCollectionDate(new Date());
+                        LinkedList<MessageInfo> uncollected = this.mq.get(topic);
+                        for (MessageInfo next : uncollected) {
+                            if (!next.isCollected()) mis.add(next);
                         }
+                        sub.notify(mis);
                         this.logger.trace("Notified subscribers of new message");
                     } catch (Exception ex) {
                         this.logger.debug("Exception occurred while giving subscribers messages: " + ex.getMessage());
+                        StringBuilder stack = new StringBuilder();
+                        for (var stel : ex.getStackTrace()) {
+                            stack.append(stel.toString());
+                            stack.append("\t\n");
+                        }
+                        this.logger.debug(stack.toString());
                     }
                 }
-
+            }
+            // Mark all transferred messages as collected
+            for (var m : mis) {
+                for (int i = 0; i < this.mq.get(topic).size(); i++) {
+                    if (m.getUuid().equals(this.mq.get(topic).get(i).getUuid())) {
+                        this.mq.get(topic).get(i).setCollected(true);
+                        this.mq.get(topic).get(i).setCollectionDate(new Date());
+                    }
+                }
             }
         }
         this.state = StateC.STARTED;
@@ -135,19 +154,19 @@ public class Broker {
 
     /**
      * Goes through the entire queue for the given topic and returns all messages in that queue, which aren't collected yet.
-     * @param topic Topic for which the queue should be analysed
+     * @param mis MessageInfo Object
      * @return All uncollected messages of that topic
      */
-    private ArrayList<MessageInfo> getUncollectedMessages(TopicC topic) {
+    private ArrayList<MessageInfo> getUncollectedMessages(LinkedList<MessageInfo> mis) {
         ArrayList<MessageInfo> msg = new ArrayList<>();
-        for (var msgInf : this.mq.get(topic)) {
-            if (!msgInf.isCollected()) msg.add(msgInf);
+        for (MessageInfo next : mis) {
+            if (!next.isCollected()) msg.add(next);
         }
         return msg;
     }
 
     /**
-     * Adds an subscriber that subscribes to this broker
+     * Adds a subscriber that subscribes to this broker
      * @param s subscriber object
      */
     public void addSubscriber(ISubscriber s) {
@@ -166,10 +185,11 @@ public class Broker {
     public ArrayList<MessageInfo> cleanup(int timeoutSeconds) {
         if (this.state.equals(StateC.WORKING)) return new ArrayList<>();
         this.state = StateC.WORKING;
-        ArrayList<MessageInfo> cleaned = new ArrayList<>();
 
+        ArrayList<MessageInfo> cleaned = new ArrayList<>();
         // Iterate through all topics
         for (TopicC t : this.mq.keySet()) {
+            ArrayList<MessageInfo> tCleaned = new ArrayList<>();
             // Iterate through all messages in that topic
             for (MessageInfo m : this.mq.get(t)) {
                 // If message was already collected, check the collection date
@@ -183,16 +203,16 @@ public class Broker {
                     // If collection date is longer ago than timeoutSeconds, remove the message from the queue
                     if (((int) (new Date().getTime() - collectionDate.getTime()) / 1000) > timeoutSeconds) {
                         this.logger.info("Message " + m + " is being cleaned up as it has not finished after timeout");
-                        cleaned.add(m);
-                        this.mq.get(t).remove(m);
+                        tCleaned.add(m);
                     }
                 } else if (((int) (new Date().getTime() - m.getReceived().getTime()) / 1000) > timeoutSeconds) {
                     // If the message has not been collected, check the received time instead
                     this.logger.info("Message " + m + " is being cleaned up as it has not finished after timeout");
-                    cleaned.add(m);
-                    this.mq.get(t).remove(m);
+                    tCleaned.add(m);
                 }
             }
+            this.mq.get(t).removeAll(tCleaned);
+            cleaned.addAll(tCleaned);
         }
 
         // Return all cleaned messages to the coordinator so it can answer
@@ -208,6 +228,7 @@ public class Broker {
     public void collectAnswersFromSubs() {
         this.state = StateC.WORKING;
         for (ISubscriber sub : this.subscribers) {
+            ArrayList<MessageInfo> sCollected = new ArrayList<>();
             for (MessageInfo mi : sub.getAnswers()) {
                 if (this.answers.get(sub.getTopic()) == null) {
                     this.logger.debug("Topic " + sub.getTopic() + " currently does not exist in answers, adding it");
@@ -215,18 +236,27 @@ public class Broker {
                 }
                 this.answers.get(sub.getTopic()).add(mi);
 
-                // TODO check if concurrent read and write may hinder each other
+                sCollected.add(mi);
+            }
+            for (MessageInfo mi : sCollected) {
                 sub.removeAnswer(mi);
             }
         }
 
         for (TopicC top : this.answers.keySet()) {
+            ArrayList<MessageInfo> toRemove = new ArrayList<>();
             for (MessageInfo mi : this.answers.get(top)) {
                 // TODO transmit answer to client
-                this.answers.get(top).remove(mi);
+                for (MessageInfo info : this.mq.get(top)) {
+                    if (info.getUuid().equals(mi.getUuid())) {
+                        toRemove.add(info);
+                    }
+                }
             }
+            this.answers.get(top).removeAll(toRemove);
         }
-        
+
+
         this.state = StateC.STARTED;
     }
 
@@ -236,7 +266,7 @@ public class Broker {
 
     public StateC getState() { return this.state; }
 
-    public boolean destroy() {
+    public void destroy() {
         for (ISubscriber sub : this.subscribers) {
             sub.setState(StateC.STOPPED);
         }
@@ -244,6 +274,5 @@ public class Broker {
             t.interrupt();
         }
         this.state = StateC.DESTROYED;
-        return true;
     }
 }

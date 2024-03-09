@@ -50,10 +50,11 @@ public class TestSubscriber implements ISubscriber {
         while (!this.state.equals(StateC.STOPPED)) {
             try {
                 if (this.state.equals(StateC.WORKING)) continue;
-                this.state = StateC.WORKING;
+
+                ArrayList<MessageInfo> toDelete = new ArrayList<>();
                 for (MessageInfo m : this.currentMessages) {
+                    this.state = StateC.WORKING;
                     this.logger.debug("Message: " + m.toString());
-                    this.currentMessages.remove(m);
 
                     int tries = 0;
                     while (this.answerState.equals(StateC.WORKING)) {
@@ -66,13 +67,25 @@ public class TestSubscriber implements ISubscriber {
                         this.logger.debug("Currently working on answers, returning");
                     } else {
                         this.answerState = StateC.WORKING;
-                        this.answers.add(MessageInfoFactory.createDefaultMessageInfo());
+                        toDelete.add(m);
+                        this.logger.debug("Deleted message " + m + " from currentMessages, adding answer");
+                        MessageInfo answer = MessageInfoFactory.createDefaultMessageInfo();
+                        answer.setUuid(m.getUuid());
+                        this.answers.add(answer);
+                        this.logger.debug("Added answer");
                         this.answerState = StateC.STARTED;
                     }
                 }
+                this.currentMessages.removeAll(toDelete);
                 this.state = StateC.STARTED;
             } catch (Exception ex) {
                 this.logger.debug("Exception in subscriber run: " + ex.getMessage());
+                StringBuilder stack = new StringBuilder();
+                for (var stel : ex.getStackTrace()) {
+                    stack.append(stel.toString());
+                    stack.append("\t\n");
+                }
+                this.logger.debug(stack.toString());
             }
         }
     }

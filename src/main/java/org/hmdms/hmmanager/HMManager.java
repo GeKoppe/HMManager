@@ -28,8 +28,8 @@ public final class HMManager {
                 mi.setFrom("Me");
 
                 HashMap<String, String> hm = new HashMap<>();
-                hm.put("Hello", "World");
-                hm.put("Moin", "Welt");
+                if (currentlyTest) hm.put("Hello", "World");
+                else hm.put("Moin", "Welt");
                 mi.setInformation(hm);
 
                 co.newMessage(currentlyTest ? TopicC.TEST : TopicC.LOGIN, mi);

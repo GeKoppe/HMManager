@@ -104,7 +104,7 @@ public class Coordinator implements Runnable {
 
     /**
      * Sets state of the coordinator. Can be used to stop it from working by setting state to StateC.STOPPED
-     * @param state
+     * @param state Current working state of the coordinator
      */
     public void setState(StateC state) { this.state = state; }
 
@@ -128,7 +128,12 @@ public class Coordinator implements Runnable {
                 }
             } catch (Exception ex) {
                 this.logger.info("Exception in run of coordinator: " + ex.getMessage());
-                this.logger.trace(ex.getStackTrace().toString());
+                StringBuilder stack = new StringBuilder();
+                for (var stel : ex.getStackTrace()) {
+                    stack.append(stel.toString());
+                    stack.append("\t\n");
+                }
+                this.logger.debug(stack.toString());
             }
         }
 
