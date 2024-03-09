@@ -61,11 +61,11 @@ public class TestCoordinator {
 
             co.newMessage(TopicC.TEST, mi);
             for (var b : co.getBrokers()) {
-                b.notifySubscriber(TopicC.LOGIN);
+                //b.notifySubscriber(TopicC.LOGIN);
             }
 
             for (var b : co.getBrokers()) {
-                b.notifySubscriber(TopicC.TEST);
+                //b.notifySubscriber(TopicC.TEST);
             }
 
             for (var b : co.getBrokers()) {

@@ -1,5 +1,6 @@
 package org.hmdms.hmmanager.msg;
 
+import org.hmdms.hmmanager.core.Component;
 import org.hmdms.hmmanager.core.StateC;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,6 +40,7 @@ public class Coordinator implements Runnable {
      */
     private final int messageTimeout;
     private final boolean brokerAutoScaling;
+    private int droppedMessages = 0;
 
     /**
      * Standard constructor for Coordinator. Looks up number of brokers to instantiate from config.properties file and instantiates them.
@@ -70,19 +72,22 @@ public class Coordinator implements Runnable {
      */
     public void newMessage(TopicC topic, MessageInfo mi) {
         if (topic == null || mi == null) throw new IllegalArgumentException("No topic or message info given");
-        int tries = 0;
 
-        while (!this.brokers.get(this.nextBroker).getState().equals(StateC.STARTED)) {
+        int tries = 0;
+        boolean dropped = false;
+        while (!this.brokers.get(this.nextBroker).addMessage(topic, mi) && tries < 2*this.numOfBrokers) {
+            this.nextBroker = (this.nextBroker + 1) % this.numOfBrokers;
             tries++;
-            if (tries == 10000) {
-                break;
+            if (tries == 2*this.numOfBrokers) {
+                dropped = true;
             }
         }
-        if (tries == 10000) {
-            return;
-        }
-        this.brokers.get(this.nextBroker).addMessage(topic, mi);
-        this.logger.debug("Added message info object to broker " + this.nextBroker + ": " + this.brokers.get(this.nextBroker).toString());
+
+        if (dropped) {
+            this.droppedMessages++;
+            this.logger.debug("Message " + mi + " has been dropped due to brokers not being available");
+            this.logger.info(this.droppedMessages + " have been dropped so far");
+        } else this.logger.debug("Added message info object to broker " + this.nextBroker + ": " + this.brokers.get(this.nextBroker).toString());
         this.nextBroker = (this.nextBroker + 1) % this.numOfBrokers;
     }
 

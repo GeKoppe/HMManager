@@ -23,7 +23,7 @@ public final class HMManager {
             boolean currentlyTest = true;
 
             while(state.equals(StateC.WORKING)) {
-                Thread.sleep(1000);
+                Thread.sleep(2000);
                 MessageInfo mi = MessageInfoFactory.createDefaultMessageInfo();
                 mi.setFrom("Me");
 

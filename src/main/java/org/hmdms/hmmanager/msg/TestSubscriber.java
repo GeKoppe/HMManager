@@ -1,5 +1,6 @@
 package org.hmdms.hmmanager.msg;
 
+import org.hmdms.hmmanager.core.BlockingComponent;
 import org.hmdms.hmmanager.core.StateC;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -7,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import javax.jms.Message;
 import java.util.ArrayList;
 
+@BlockingComponent
 public class TestSubscriber implements ISubscriber {
 
     private final Logger logger = LoggerFactory.getLogger(TestSubscriber.class);
@@ -49,8 +51,6 @@ public class TestSubscriber implements ISubscriber {
     public void run() {
         while (!this.state.equals(StateC.STOPPED)) {
             try {
-                if (this.state.equals(StateC.WORKING)) continue;
-
                 ArrayList<MessageInfo> toDelete = new ArrayList<>();
                 for (MessageInfo m : this.currentMessages) {
                     this.state = StateC.WORKING;
@@ -117,5 +117,26 @@ public class TestSubscriber implements ISubscriber {
     @Override
     public void setState(StateC state) {
         this.state = state;
+    }
+
+    /**
+     * Waits for the components state to change to started, then sets it to RESERVED.
+     * @return True, if the execution could be reserved, false otherwise
+     */
+    private boolean tryToReserve() {
+        // Wait 10.0000 loops for the state of the component to change to started
+        int tries = 0;
+        while (!this.state.equals(StateC.STARTED)) {
+            tries++;
+            if (tries == 10000) {
+                break;
+            }
+        }
+        if (tries == 10000) {
+            this.logger.debug("Broker " + this + " could not be reserved");
+            return false;
+        }
+        this.state = StateC.RESERVED;
+        return true;
     }
 }

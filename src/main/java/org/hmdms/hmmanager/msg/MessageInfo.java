@@ -162,6 +162,7 @@ public class MessageInfo {
                 ", from='" + from + '\'' +
                 ", information=" + information +
                 ", collected=" + collected +
+                ", collectionDate=" + collectionDate +
                 '}';
     }
 
