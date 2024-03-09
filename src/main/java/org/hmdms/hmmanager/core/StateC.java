@@ -1,4 +1,4 @@
-package org.hmdms.hmmanager.msg;
+package org.hmdms.hmmanager.core;
 
 /**
  * Defines states for various components in the system
@@ -13,6 +13,10 @@ public enum StateC {
      */
     STARTED,
     /**
+     * Component is reserved for other access
+     */
+    RESERVED,
+    /**
      * Component is currently doing something
      */
     WORKING,
@@ -23,5 +27,5 @@ public enum StateC {
     /**
      * Component was disregarded
      */
-    DESTROYED
+    DESTROYED,
 }

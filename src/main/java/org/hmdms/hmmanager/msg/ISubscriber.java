@@ -1,6 +1,7 @@
 package org.hmdms.hmmanager.msg;
 
-import java.lang.reflect.Array;
+import org.hmdms.hmmanager.core.StateC;
+
 import java.util.ArrayList;
 
 /**
@@ -30,4 +31,8 @@ public interface ISubscriber extends Runnable {
      * @return Answers the subscriber compiled
      */
     ArrayList<MessageInfo> getAnswers();
+
+    void setState(StateC state);
+
+    boolean removeAnswer(MessageInfo mi);
 }

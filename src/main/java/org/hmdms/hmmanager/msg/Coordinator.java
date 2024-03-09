@@ -1,13 +1,11 @@
 package org.hmdms.hmmanager.msg;
 
+import org.hmdms.hmmanager.core.StateC;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.jms.Message;
-import javax.jms.MessageListener;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.NotActiveException;
 import java.util.ArrayList;
 import java.util.Properties;
 
@@ -40,6 +38,7 @@ public class Coordinator implements Runnable {
      * Time in seconds before a message is dropped
      */
     private final int messageTimeout;
+    private final boolean brokerAutoScaling;
 
     /**
      * Standard constructor for Coordinator. Looks up number of brokers to instantiate from config.properties file and instantiates them.
@@ -52,6 +51,7 @@ public class Coordinator implements Runnable {
         prop.load(inputStream);
         this.numOfBrokers = Integer.parseInt(prop.getProperty("msg.scaling.brokers"));
         this.messageTimeout = Integer.parseInt(prop.getProperty("msg.timeout"));
+        this.brokerAutoScaling = Boolean.parseBoolean(prop.getProperty("msg.scaling.brokers.autoScaling"));
 
         this.brokers = new ArrayList<>();
         for (int i = 0; i < this.numOfBrokers; i++) {
@@ -70,6 +70,17 @@ public class Coordinator implements Runnable {
      */
     public void newMessage(TopicC topic, MessageInfo mi) {
         if (topic == null || mi == null) throw new IllegalArgumentException("No topic or message info given");
+        int tries = 0;
+
+        while (!this.brokers.get(this.nextBroker).getState().equals(StateC.STARTED)) {
+            tries++;
+            if (tries == 10000) {
+                break;
+            }
+        }
+        if (tries == 10000) {
+            return;
+        }
         this.brokers.get(this.nextBroker).addMessage(topic, mi);
         this.logger.debug("Added message info object to broker " + this.nextBroker + ": " + this.brokers.get(this.nextBroker).toString());
         this.nextBroker = (this.nextBroker + 1) % this.numOfBrokers;
@@ -104,12 +115,25 @@ public class Coordinator implements Runnable {
     public void run() {
         if (!this.state.equals(StateC.STARTED)) return;
         this.state = StateC.WORKING;
+
         while (this.state.equals(StateC.WORKING)) {
-            for (Broker b : this.brokers) {
-                b.notifyAllSubscribers();
-                b.collectAnswersFromSubs();
-                ArrayList<MessageInfo> cleanedMessages = b.cleanup(this.messageTimeout);
+            try {
+                for (Broker b : this.brokers) {
+                    b.notifyAllSubscribers();
+                    b.collectAnswersFromSubs();
+                    ArrayList<MessageInfo> cleanedMessages = b.cleanup(this.messageTimeout);
+                    for (MessageInfo mi : cleanedMessages) {
+                        this.logger.info("Cleaned up message: " + mi.toString());
+                    }
+                }
+            } catch (Exception ex) {
+                this.logger.info("Exception in run of coordinator: " + ex.getMessage());
+                this.logger.trace(ex.getStackTrace().toString());
             }
+        }
+
+        for (Broker br : this.brokers) {
+            br.destroy();
         }
 
         this.logger.debug("Coordinator stopped");
@@ -122,15 +146,18 @@ public class Coordinator implements Runnable {
     public void setup() {
         this.logger.debug("Setting up coordinator");
         this.logger.debug("Adding brokers");
+
+        // Setup all brokers
         for (int i = 0; i < this.numOfBrokers; i++) {
             this.brokers.add(new Broker());
         }
 
-
-        for (Broker b : this.brokers) {
-            b.addSubscriber(new TestSubscriber());
+        for (Broker br : this.brokers) {
+            br.addSubscriber(new TestSubscriber());
         }
+
         this.state = StateC.STARTED;
         this.logger.debug("Coordinator is fully setup");
     }
+    
 }

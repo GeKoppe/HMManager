@@ -1,5 +1,6 @@
 package org.hmdms.hmmanager.msg;
 
+import org.hmdms.hmmanager.core.StateC;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,15 +30,19 @@ public class Broker {
     /**
      * Answers collected from subscribers
      */
-    private final ArrayList<MessageInfo> answers;
+    private final HashMap<TopicC, ArrayList<MessageInfo>> answers;
+    private final HashMap<TopicC, LinkedList<MessageInfo>> cache;
 
+    private final LinkedList<Thread> subThreads;
     private StateC state;
     public Broker () {
         logger.debug("Broker instantiated");
         this.mq = new HashMap<>();
         this.subscribers = new ArrayList<>();
         this.state = StateC.STARTED;
-        this.answers = new ArrayList<>();
+        this.answers = new HashMap<>();
+        this.cache = new HashMap<>();
+        this.subThreads = new LinkedList<>();
     }
 
     /**
@@ -46,6 +51,8 @@ public class Broker {
      * @param mi Message to be added
      */
     public void addMessage(TopicC topic, MessageInfo mi) {
+        if (this.state.equals(StateC.WORKING)) return;
+        this.state = StateC.WORKING;
         if (topic == null) throw new IllegalArgumentException("No topic given");
         this.logger.debug("Adding message " + mi + " to message queue");
 
@@ -58,6 +65,7 @@ public class Broker {
         // Add message to the list in the message queue
         this.mq.get(topic).add(mi);
         this.logger.debug("MessageInfo object " + mi + " added to queue for topic " + topic);
+        this.state = StateC.STARTED;
     }
 
     /**
@@ -65,18 +73,22 @@ public class Broker {
      * @param topic Topic for which the subscribers should be notified
      */
     public void notifySubscriber(TopicC topic) {
+        if (this.state.equals(StateC.WORKING)) return;
         this.state = StateC.WORKING;
         if (this.mq.get(topic) == null) {
             this.logger.debug("Topic " + topic.name() + " does not currently exist in message queue");
             return;
         }
         // Iterate through all subscribers
-        for (ISubscriber o : this.subscribers) {
+        for (ISubscriber sub : this.subscribers) {
             // If subscriber subscribes given topic, give them messages concerning the topic
-            if (o.getTopic().equals(topic) && o.getState().equals(StateC.STARTED)) {
+            if (sub.getTopic().equals(topic) && sub.getState().equals(StateC.STARTED)) {
                 try {
+                    // Get all messages that have not been collected yet and give them to subscriber
                     ArrayList<MessageInfo> mis = this.getUncollectedMessages(topic);
-                    o.notify(mis);
+                    sub.notify(mis);
+
+                    // Mark all transferred messages as collected
                     for (var m : mis) {
                         m.setCollected(true);
                         m.setCollectionDate(new Date());
@@ -94,13 +106,18 @@ public class Broker {
      * Method to notify all subscribers of all topics to get any not yet collected messages out
      */
     public void notifyAllSubscribers() {
+        if (this.state.equals(StateC.WORKING)) return;
+        this.state = StateC.WORKING;
         for (TopicC topic : this.mq.keySet()) {
-            for (ISubscriber o : this.subscribers) {
+            for (ISubscriber sub : this.subscribers) {
                 // If subscriber subscribes to given topic, give them messages concerning the topic
-                if (o.getTopic().equals(topic)) {
+                if (sub.getTopic().equals(topic) && sub.getState().equals(StateC.STARTED)) {
                     try {
+                        // Get all collected messages and give them to the subscriber
                         ArrayList<MessageInfo> mis = this.getUncollectedMessages(topic);
-                        o.notify(mis);
+                        sub.notify(mis);
+
+                        // Mark all transferred messages as collected
                         for (var m : mis) {
                             m.setCollected(true);
                             m.setCollectionDate(new Date());
@@ -113,6 +130,7 @@ public class Broker {
 
             }
         }
+        this.state = StateC.STARTED;
     }
 
     /**
@@ -135,6 +153,9 @@ public class Broker {
     public void addSubscriber(ISubscriber s) {
         this.subscribers.add(s);
         this.logger.debug("Added subscriber " + s.toString());
+
+        this.subThreads.add(new Thread(s));
+        this.subThreads.getLast().start();
     }
 
     /**
@@ -143,6 +164,8 @@ public class Broker {
      * @return All cleaned messages, because the coordinator still has to answer them
      */
     public ArrayList<MessageInfo> cleanup(int timeoutSeconds) {
+        if (this.state.equals(StateC.WORKING)) return new ArrayList<>();
+        this.state = StateC.WORKING;
         ArrayList<MessageInfo> cleaned = new ArrayList<>();
 
         // Iterate through all topics
@@ -173,6 +196,7 @@ public class Broker {
         }
 
         // Return all cleaned messages to the coordinator so it can answer
+        this.state = StateC.STARTED;
         return cleaned;
     }
 
@@ -182,8 +206,44 @@ public class Broker {
      * the internal answers list of the broker
      */
     public void collectAnswersFromSubs() {
+        this.state = StateC.WORKING;
         for (ISubscriber sub : this.subscribers) {
-            this.answers.addAll(sub.getAnswers());
+            for (MessageInfo mi : sub.getAnswers()) {
+                if (this.answers.get(sub.getTopic()) == null) {
+                    this.logger.debug("Topic " + sub.getTopic() + " currently does not exist in answers, adding it");
+                    this.answers.put(sub.getTopic(), new ArrayList<>());
+                }
+                this.answers.get(sub.getTopic()).add(mi);
+
+                // TODO check if concurrent read and write may hinder each other
+                sub.removeAnswer(mi);
+            }
         }
+
+        for (TopicC top : this.answers.keySet()) {
+            for (MessageInfo mi : this.answers.get(top)) {
+                // TODO transmit answer to client
+                this.answers.get(top).remove(mi);
+            }
+        }
+        
+        this.state = StateC.STARTED;
+    }
+
+    public ArrayList<ISubscriber> getSubscribers() {
+        return this.subscribers;
+    }
+
+    public StateC getState() { return this.state; }
+
+    public boolean destroy() {
+        for (ISubscriber sub : this.subscribers) {
+            sub.setState(StateC.STOPPED);
+        }
+        for (Thread t : this.subThreads) {
+            t.interrupt();
+        }
+        this.state = StateC.DESTROYED;
+        return true;
     }
 }
