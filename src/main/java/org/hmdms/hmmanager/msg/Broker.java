@@ -1,17 +1,17 @@
 package org.hmdms.hmmanager.msg;
 
-import org.hmdms.hmmanager.core.BlockingComponent;
 import org.hmdms.hmmanager.core.StateC;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * This class manages all messages given to the system and gives them to their respective services, which in turn
  * subscribe to this class
  */
-@BlockingComponent
 public class Broker {
     /**
      * Logger
@@ -22,6 +22,7 @@ public class Broker {
      * All messages, sorted by topic
      */
     private final HashMap<TopicC, LinkedList<MessageInfo>> mq;
+    private final ReentrantLock mqLock = new ReentrantLock();
     /**
      * All subscribers that subscribe to this broker
      */
@@ -30,11 +31,8 @@ public class Broker {
      * Answers collected from subscribers
      */
     private final HashMap<TopicC, ArrayList<MessageInfo>> answers;
-    /**
-     * Currently not used
-     */
-    @Deprecated
-    private final HashMap<TopicC, LinkedList<MessageInfo>> cache;
+    private final ReentrantLock answersLock = new ReentrantLock();
+
     /**
      * Threads of all subscribers to this broker
      */
@@ -52,7 +50,6 @@ public class Broker {
         this.subscribers = new ArrayList<>();
         this.state = StateC.STARTED;
         this.answers = new HashMap<>();
-        this.cache = new HashMap<>();
         this.subThreads = new LinkedList<>();
         this.logger.debug("Broker instantiated");
     }
@@ -63,6 +60,7 @@ public class Broker {
      * @param mi Message to be added
      */
     public boolean addMessage(TopicC topic, MessageInfo mi) {
+        if (!this.tryToAcquireMqLock()) return false;
         try {
             if (topic == null) throw new IllegalArgumentException("No topic given");
             this.logger.debug("Adding message " + mi + " to message queue");
@@ -76,6 +74,7 @@ public class Broker {
             // Add message to the list in the message queue
             this.mq.get(topic).add(mi);
             this.logger.debug("MessageInfo object " + mi + " added to queue for topic " + topic);
+            if (this.mqLock.isHeldByCurrentThread()) this.mqLock.unlock();
             return true;
         } catch (Exception ex) {
             this.logger.info("Could not add message due to exception: " + ex.getMessage());
@@ -86,6 +85,7 @@ public class Broker {
                 sb.append("\t");
             }
             this.logger.debug(sb.toString());
+            if (this.mqLock.isHeldByCurrentThread()) this.mqLock.unlock();
             return false;
         }
     }
@@ -94,10 +94,12 @@ public class Broker {
      * Method to notify all subscribers of all topics to get any not yet collected messages out
      */
     public boolean notifyAllSubscribers() {
+        if (!this.tryToAcquireMqLock()) return false;
         try {
             Set<TopicC> keySet = this.mq.keySet();
             for (TopicC topic : keySet) {
                 ArrayList<MessageInfo> mis = new ArrayList<>();
+                boolean transferred = false;
 
                 if (this.mq.get(topic) == null || this.mq.get(topic).isEmpty()) {
                     continue;
@@ -111,7 +113,7 @@ public class Broker {
                             for (MessageInfo next : uncollected) {
                                 if (!next.isCollected()) mis.add(next);
                             }
-                            sub.notify(mis);
+                            transferred = sub.notify(mis);
                             this.logger.trace("Notified subscribers of new message");
                         } catch (Exception ex) {
                             this.logger.debug("Exception occurred while giving subscribers messages: " + ex.getMessage());
@@ -126,16 +128,18 @@ public class Broker {
                 }
 
                 // Mark all transferred messages as collected
-                for (var m : mis) {
-                    for (int i = 0; i < this.mq.get(topic).size(); i++) {
-                        if (m.getUuid().equals(this.mq.get(topic).get(i).getUuid())) {
-                            this.mq.get(topic).get(i).setCollected(true);
-                            this.mq.get(topic).get(i).setCollectionDate(new Date());
+                if (transferred) {
+                    for (var m : mis) {
+                        for (int i = 0; i < this.mq.get(topic).size(); i++) {
+                            if (m.getUuid().equals(this.mq.get(topic).get(i).getUuid())) {
+                                this.mq.get(topic).get(i).setCollected(true);
+                                this.mq.get(topic).get(i).setCollectionDate(new Date());
+                            }
                         }
                     }
                 }
             }
-
+            if (this.mqLock.isHeldByCurrentThread()) this.mqLock.unlock();
             return true;
         } catch (Exception ex) {
             this.logger.info("Could notify subscribers due to exception: " + ex.getMessage());
@@ -145,6 +149,7 @@ public class Broker {
                 sb.append("\n");
                 sb.append("\t");
             }
+            if (this.mqLock.isHeldByCurrentThread()) this.mqLock.unlock();
             this.logger.debug(sb.toString());
             return false;
         }
@@ -182,7 +187,7 @@ public class Broker {
      * @return All cleaned messages, because the coordinator still has to answer them
      */
     public ArrayList<MessageInfo> cleanup(int timeoutSeconds) {
-
+        if (!this.tryToAcquireMqLock()) return null;
         try {
             ArrayList<MessageInfo> cleaned = new ArrayList<>();
             // Iterate through all topics
@@ -214,6 +219,7 @@ public class Broker {
             }
 
             // Return all cleaned messages to the coordinator so it can answer
+            if (this.mqLock.isHeldByCurrentThread()) this.mqLock.unlock();
             return cleaned;
         } catch (Exception ex) {
             this.logger.info("Could notify subscribers due to exception: " + ex.getMessage());
@@ -224,6 +230,7 @@ public class Broker {
                 sb.append("\t");
             }
             this.logger.debug(sb.toString());
+            if (this.mqLock.isHeldByCurrentThread()) this.mqLock.unlock();
             return null;
         }
     }
@@ -234,6 +241,7 @@ public class Broker {
      * the internal answers list of the broker
      */
     public boolean collectAnswersFromSubs() {
+        if (!this.tryToAcquireAnswersLock()) return false;
         try {
             for (ISubscriber sub : this.subscribers) {
                 ArrayList<MessageInfo> sCollected = new ArrayList<>();
@@ -251,19 +259,21 @@ public class Broker {
                 }
             }
 
-            for (TopicC top : this.answers.keySet()) {
-                ArrayList<MessageInfo> toRemove = new ArrayList<>();
-                for (MessageInfo mi : this.answers.get(top)) {
-                    // TODO transmit answer to client
-                    for (MessageInfo info : this.mq.get(top)) {
-                        if (info.getUuid().equals(mi.getUuid())) {
-                            toRemove.add(info);
+            if (this.tryToAcquireMqLock()) {
+                for (TopicC top : this.answers.keySet()) {
+                    ArrayList<MessageInfo> toRemove = new ArrayList<>();
+                    for (MessageInfo mi : this.answers.get(top)) {
+                        for (MessageInfo info : this.mq.get(top)) {
+                            if (info.getUuid().equals(mi.getUuid())) {
+                                toRemove.add(info);
+                            }
                         }
                     }
+                    this.mq.get(top).removeAll(toRemove);
                 }
-                this.answers.get(top).removeAll(toRemove);
             }
-
+            if (this.mqLock.isHeldByCurrentThread()) this.mqLock.unlock();
+            if (this.answersLock.isHeldByCurrentThread()) this.answersLock.unlock();
             return true;
         } catch (Exception ex) {
             this.logger.info("Could notify subscribers due to exception: " + ex.getMessage());
@@ -274,8 +284,14 @@ public class Broker {
                 sb.append("\t");
             }
             this.logger.debug(sb.toString());
+            if (this.answersLock.isHeldByCurrentThread()) this.answersLock.unlock();
             return false;
         }
+    }
+
+    public boolean deleteAnsweredMessages() {
+
+        return true;
     }
 
     public void destroy() {
@@ -286,5 +302,44 @@ public class Broker {
             t.interrupt();
         }
         this.state = StateC.DESTROYED;
+    }
+
+    private boolean tryToAcquireMqLock() {
+        this.logger.trace("Thread " + Thread.currentThread() + " trying to acquire Lock on Message queue");
+        if (!this.mqLock.isHeldByCurrentThread()) {
+            try {
+                if (!this.mqLock.tryLock(200, TimeUnit.MILLISECONDS)) {
+                    return false;
+                }
+            } catch (Exception ex) {
+                this.logger.debug("Exception occurred while trying to acquire lock on object " + mqLock + ": " + ex.getMessage());
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean tryToAcquireAnswersLock() {
+        this.logger.trace("Thread " + Thread.currentThread() + " trying to acquire Lock on answers");
+        if (!this.answersLock.isHeldByCurrentThread()) {
+            try {
+                if (!this.answersLock.tryLock(200, TimeUnit.MILLISECONDS)) {
+                    return false;
+                }
+            } catch (Exception ex) {
+                this.logger.debug("Exception occurred while trying to acquire lock on object " + answersLock + ": " + ex.getMessage());
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public HashMap<TopicC, ArrayList<MessageInfo>> getAndDeleteAnswers() {
+        HashMap<TopicC, ArrayList<MessageInfo>> answers = this.answers;
+        if (this.tryToAcquireAnswersLock()) {
+            this.answers.clear();
+        }
+        if (this.answersLock.isHeldByCurrentThread()) this.answersLock.unlock();
+        return answers;
     }
 }

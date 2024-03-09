@@ -11,8 +11,9 @@ public interface ISubscriber extends Runnable {
     /**
      * Gives the subscriber all new messages concerning their topic
      * @param mi Messages
+     * @return True, if messages could be transmitted
      */
-    void notify(ArrayList<MessageInfo> mi);
+    boolean notify(ArrayList<MessageInfo> mi);
 
     /**
      * Method used to check for the topic the subscriber subscribes to

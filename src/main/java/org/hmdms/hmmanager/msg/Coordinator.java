@@ -1,6 +1,5 @@
 package org.hmdms.hmmanager.msg;
 
-import org.hmdms.hmmanager.core.Component;
 import org.hmdms.hmmanager.core.StateC;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -8,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Properties;
 
 /**
@@ -126,6 +126,13 @@ public class Coordinator implements Runnable {
                 for (Broker b : this.brokers) {
                     b.notifyAllSubscribers();
                     b.collectAnswersFromSubs();
+                    HashMap<TopicC, ArrayList<MessageInfo>> answers = b.getAndDeleteAnswers();
+
+                    for (TopicC top : answers.keySet()) {
+                        for (MessageInfo mi : answers.get(top)) {
+                            this.logger.debug("Answer from broker: " + mi.toString());
+                        }
+                    }
                     ArrayList<MessageInfo> cleanedMessages = b.cleanup(this.messageTimeout);
                     for (MessageInfo mi : cleanedMessages) {
                         this.logger.info("Cleaned up message: " + mi.toString());

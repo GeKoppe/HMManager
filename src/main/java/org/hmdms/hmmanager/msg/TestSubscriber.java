@@ -1,14 +1,13 @@
 package org.hmdms.hmmanager.msg;
 
-import org.hmdms.hmmanager.core.BlockingComponent;
 import org.hmdms.hmmanager.core.StateC;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.jms.Message;
 import java.util.ArrayList;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 
-@BlockingComponent
 public class TestSubscriber implements ISubscriber {
 
     private final Logger logger = LoggerFactory.getLogger(TestSubscriber.class);
@@ -16,7 +15,9 @@ public class TestSubscriber implements ISubscriber {
     private StateC state;
     private StateC answerState;
     private final ArrayList<MessageInfo> currentMessages;
+    private final ReentrantLock cmLock = new ReentrantLock();
     private final ArrayList<MessageInfo> answers;
+    private final ReentrantLock answersLock = new ReentrantLock();
     public TestSubscriber() {
         this.currentMessages = new ArrayList<>();
         this.answers = new ArrayList<>();
@@ -32,10 +33,11 @@ public class TestSubscriber implements ISubscriber {
     }
 
     @Override
-    public void notify(ArrayList<MessageInfo> mi) {
-        this.state = StateC.WORKING;
+    public boolean notify(ArrayList<MessageInfo> mi) {
+        if (!this.tryToAcquireCmLock()) return false;
         this.currentMessages.addAll(mi);
-        this.state = StateC.STARTED;
+        if (this.cmLock.isHeldByCurrentThread()) this.cmLock.unlock();
+        return true;
     }
 
     /**
@@ -51,33 +53,21 @@ public class TestSubscriber implements ISubscriber {
     public void run() {
         while (!this.state.equals(StateC.STOPPED)) {
             try {
+                if (!this.tryToAcquireCmLock()) continue;
                 ArrayList<MessageInfo> toDelete = new ArrayList<>();
                 for (MessageInfo m : this.currentMessages) {
-                    this.state = StateC.WORKING;
                     this.logger.debug("Message: " + m.toString());
 
-                    int tries = 0;
-                    while (this.answerState.equals(StateC.WORKING)) {
-                        tries++;
-                        if (tries == 10000) {
-                            break;
-                        }
-                    }
-                    if (tries == 10000) {
-                        this.logger.debug("Currently working on answers, returning");
-                    } else {
-                        this.answerState = StateC.WORKING;
+                    this.logger.debug("Deleted message " + m + " from currentMessages, adding answer");
+                    MessageInfo answer = MessageInfoFactory.createDefaultMessageInfo();
+                    answer.setUuid(m.getUuid());
+                    if (this.answers.add(answer)) {
                         toDelete.add(m);
-                        this.logger.debug("Deleted message " + m + " from currentMessages, adding answer");
-                        MessageInfo answer = MessageInfoFactory.createDefaultMessageInfo();
-                        answer.setUuid(m.getUuid());
-                        this.answers.add(answer);
-                        this.logger.debug("Added answer");
-                        this.answerState = StateC.STARTED;
                     }
+                    if (this.answersLock.isHeldByCurrentThread()) this.answersLock.unlock();
+                    this.logger.debug("Added answer");
                 }
                 this.currentMessages.removeAll(toDelete);
-                this.state = StateC.STARTED;
             } catch (Exception ex) {
                 this.logger.debug("Exception in subscriber run: " + ex.getMessage());
                 StringBuilder stack = new StringBuilder();
@@ -86,6 +76,8 @@ public class TestSubscriber implements ISubscriber {
                     stack.append("\t\n");
                 }
                 this.logger.debug(stack.toString());
+            } finally {
+                if (this.cmLock.isHeldByCurrentThread()) this.cmLock.unlock();
             }
         }
     }
@@ -97,21 +89,10 @@ public class TestSubscriber implements ISubscriber {
 
     @Override
     public boolean removeAnswer(MessageInfo mi) {
-        int tries = 0;
-        while (this.answerState.equals(StateC.WORKING)) {
-            tries++;
-            if (tries == 10000) {
-                break;
-            }
-        }
-        if (tries == 10000) {
-            this.logger.debug("Currently working on answers, returning");
-            return false;
-        }
-        this.answerState = StateC.WORKING;
+        if (!this.tryToAcquireAnswersLock()) return false;
         this.answers.remove(mi);
         this.logger.debug("Removed answer " + mi + " from answer cache");
-        this.answerState = StateC.STARTED;
+        if (this.answersLock.isHeldByCurrentThread()) this.answersLock.unlock();
         return true;
     }
     @Override
@@ -119,24 +100,31 @@ public class TestSubscriber implements ISubscriber {
         this.state = state;
     }
 
-    /**
-     * Waits for the components state to change to started, then sets it to RESERVED.
-     * @return True, if the execution could be reserved, false otherwise
-     */
-    private boolean tryToReserve() {
-        // Wait 10.0000 loops for the state of the component to change to started
-        int tries = 0;
-        while (!this.state.equals(StateC.STARTED)) {
-            tries++;
-            if (tries == 10000) {
-                break;
+    private boolean tryToAcquireCmLock() {
+        if (!this.cmLock.isHeldByCurrentThread()) {
+            try {
+                if (!this.cmLock.tryLock(200, TimeUnit.MILLISECONDS)) {
+                    return false;
+                }
+            } catch (Exception ex) {
+                this.logger.debug("Exception occurred while trying to acquire lock on object " + cmLock + ": " + ex.getMessage());
+                return false;
             }
         }
-        if (tries == 10000) {
-            this.logger.debug("Broker " + this + " could not be reserved");
-            return false;
+        return true;
+    }
+
+    private boolean tryToAcquireAnswersLock() {
+        if (!this.answersLock.isHeldByCurrentThread()) {
+            try {
+                if (!this.answersLock.tryLock(200, TimeUnit.MILLISECONDS)) {
+                    return false;
+                }
+            } catch (Exception ex) {
+                this.logger.debug("Exception occurred while trying to acquire lock on object " + answersLock + ": " + ex.getMessage());
+                return false;
+            }
         }
-        this.state = StateC.RESERVED;
         return true;
     }
 }
