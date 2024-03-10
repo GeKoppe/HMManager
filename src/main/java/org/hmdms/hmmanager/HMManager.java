@@ -1,12 +1,12 @@
 package org.hmdms.hmmanager;
 
 import org.hmdms.hmmanager.core.StateC;
-import org.hmdms.hmmanager.msg.Coordinator;
-import org.hmdms.hmmanager.msg.MessageInfo;
-import org.hmdms.hmmanager.msg.MessageInfoFactory;
-import org.hmdms.hmmanager.msg.TopicC;
+import org.hmdms.hmmanager.msg.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.SpringApplication;
+import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.jms.core.JmsTemplate;
 
 import java.util.HashMap;
 
@@ -20,23 +20,23 @@ public final class HMManager {
             Thread coordinatorThread = new Thread(co);
             coordinatorThread.start();
 
-            boolean currentlyTest = true;
+            ConfigurableApplicationContext ctx = SpringApplication.run(JmsBroker.class);
+            JmsTemplate tpl = ctx.getBean(JmsTemplate.class);
+            co.setTpl(tpl);
 
-            while(state.equals(StateC.WORKING)) {
-                Thread.sleep(2000);
+            boolean currentlyTest = false;
+            while (true) {
+                Thread.sleep(500);
                 MessageInfo mi = MessageInfoFactory.createDefaultMessageInfo();
                 mi.setFrom("Me");
 
                 HashMap<String, String> hm = new HashMap<>();
-                if (currentlyTest) hm.put("Hello", "World");
-                else hm.put("Moin", "Welt");
+                hm.put("Hello", "World");
+                hm.put("Moin", "Welt");
                 mi.setInformation(hm);
-
-                co.newMessage(currentlyTest ? TopicC.TEST : TopicC.LOGIN, mi);
+                tpl.convertAndSend("coordinator",  new JmsMessage(currentlyTest ? TopicC.TEST : TopicC.LOGIN, mi));
                 currentlyTest = !currentlyTest;
             }
-            co.setState(StateC.STOPPED);
-            coordinatorThread.interrupt();
         } catch (Exception ex) {
             logger.warn("Exception in running the coordinator: " + ex.getMessage());
         }

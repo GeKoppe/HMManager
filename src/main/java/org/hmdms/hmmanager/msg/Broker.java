@@ -176,6 +176,7 @@ public class Broker extends BlockingComponent {
         this.logger.debug("Successfully added subscriber " + s + " and started their thread");
         this.unlock("sub");
         this.unlock("thread");
+        return true;
     }
 
     /**

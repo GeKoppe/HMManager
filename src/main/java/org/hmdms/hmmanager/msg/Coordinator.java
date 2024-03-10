@@ -3,6 +3,9 @@ package org.hmdms.hmmanager.msg;
 import org.hmdms.hmmanager.core.StateC;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.jms.annotation.JmsListener;
+import org.springframework.jms.core.JmsTemplate;
+import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -14,6 +17,7 @@ import java.util.Properties;
  * Entry point for messages into the system. Receives messages from other components, distributes them among
  * {@link Broker} objects and coordinates answering the messages when the job is finished
  */
+@Component
 public class Coordinator implements Runnable {
     /**
      * Current state of the coordinator
@@ -41,6 +45,7 @@ public class Coordinator implements Runnable {
     private final int messageTimeout;
     private final boolean brokerAutoScaling;
     private int droppedMessages = 0;
+    private JmsTemplate tpl;
 
     /**
      * Standard constructor for Coordinator. Looks up number of brokers to instantiate from config.properties file and instantiates them.
@@ -190,5 +195,17 @@ public class Coordinator implements Runnable {
         this.state = StateC.STARTED;
         this.logger.debug("Coordinator is fully setup");
     }
-    
+
+    @JmsListener(destination = "coordinator", containerFactory = "hmmanagerFactory")
+    public void receiveMessage(JmsMessage mi) {
+        this.newMessage(mi.getTopic(), mi.getMi());
+    }
+
+    public JmsTemplate getTpl() {
+        return tpl;
+    }
+
+    public void setTpl(JmsTemplate tpl) {
+        this.tpl = tpl;
+    }
 }
