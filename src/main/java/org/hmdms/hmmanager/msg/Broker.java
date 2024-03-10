@@ -6,8 +6,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * This class manages all messages given to the system and gives them to their respective services, which in turn
@@ -43,7 +41,7 @@ public class Broker extends BlockingComponent {
      * @throws IllegalArgumentException Exception thrown by super constructor
      */
     public Broker () throws IllegalArgumentException {
-        super(new String[]{"mq", "answer"});
+        super(new String[]{"mq", "answer", "sub", "thread"});
         this.mq = new HashMap<>();
         this.subscribers = new ArrayList<>();
         this.setState(StateC.STARTED);
@@ -153,30 +151,31 @@ public class Broker extends BlockingComponent {
         }
 
     }
-
-    /**
-     * Goes through the entire queue for the given topic and returns all messages in that queue, which aren't collected yet.
-     * @param mis MessageInfo Object
-     * @return All uncollected messages of that topic
-     */
-    private ArrayList<MessageInfo> getUncollectedMessages(LinkedList<MessageInfo> mis) {
-        ArrayList<MessageInfo> msg = new ArrayList<>();
-        for (MessageInfo next : mis) {
-            if (!next.isCollected()) msg.add(next);
-        }
-        return msg;
-    }
-
     /**
      * Adds a subscriber that subscribes to this broker
      * @param s subscriber object
      */
-    public void addSubscriber(ISubscriber s) {
+    public boolean addSubscriber(ISubscriber s) {
+        if (!this.tryToAcquireLock("sub")) {
+            this.logger.info("Could not lock subscribers object and therefore cannot add subscriber " + s.toString() + ", returning");
+            this.unlock("sub");
+            return false;
+        }
         this.subscribers.add(s);
         this.logger.debug("Added subscriber " + s.toString());
 
+        if (!this.tryToAcquireLock("thread")) {
+            this.logger.info("Could not lock threads object and therefore cannot add subscriber " + s.toString() + ", returning");
+            this.unlock("thread");
+            this.subscribers.remove(s);
+            this.unlock("sub");
+            return false;
+        }
         this.subThreads.add(new Thread(s));
         this.subThreads.getLast().start();
+        this.logger.debug("Successfully added subscriber " + s + " and started their thread");
+        this.unlock("sub");
+        this.unlock("thread");
     }
 
     /**
@@ -216,7 +215,7 @@ public class Broker extends BlockingComponent {
                 cleaned.addAll(tCleaned);
             }
 
-            // Return all cleaned messages to the coordinator so it can answer
+            // Return all cleaned messages to the coordinator, so it can answer
             this.unlock("mq");
             return cleaned;
         } catch (Exception ex) {
@@ -239,24 +238,32 @@ public class Broker extends BlockingComponent {
      * the internal answers list of the broker
      */
     public boolean collectAnswersFromSubs() {
+        // Try to lock the answers queue
         if (!this.tryToAcquireLock("answer")) return false;
         try {
+            // Iterate through all subscribers
             for (ISubscriber sub : this.subscribers) {
                 ArrayList<MessageInfo> sCollected = new ArrayList<>();
+
+                // Iterate through all answers the subscriber has stored
                 for (MessageInfo mi : sub.getAnswers()) {
+                    // If the topic currently doesn't exist in the answers queue, add it
                     if (this.answers.get(sub.getTopic()) == null) {
                         this.logger.debug("Topic " + sub.getTopic() + " currently does not exist in answers, adding it");
                         this.answers.put(sub.getTopic(), new ArrayList<>());
                     }
-                    this.answers.get(sub.getTopic()).add(mi);
 
+                    // Add answer to the answers queue
+                    this.answers.get(sub.getTopic()).add(mi);
                     sCollected.add(mi);
                 }
+                // Remove answer from subscriber
                 for (MessageInfo mi : sCollected) {
                     sub.removeAnswer(mi);
                 }
             }
 
+            // Set all messages that have been answered as answered
             if (this.tryToAcquireLock("mq")) {
                 for (TopicC top : this.answers.keySet()) {
                     ArrayList<MessageInfo> toRemove = new ArrayList<>();
@@ -270,6 +277,7 @@ public class Broker extends BlockingComponent {
                     this.mq.get(top).removeAll(toRemove);
                 }
             }
+            // Unlock the queues
             this.unlock("mq");
             this.unlock("answer");
             return true;
@@ -287,21 +295,46 @@ public class Broker extends BlockingComponent {
         }
     }
 
-    public boolean deleteAnsweredMessages() {
-
-        return true;
-    }
-
+    /**
+     * Sets stopped status on all subscribers and then waits for their thread to end.
+     * If the thread does not end within 200ms, the thread will be interrupted
+     */
     public void destroy() {
+        // Set stopped state on all subscribers so their thread comes to a stop
         for (ISubscriber sub : this.subscribers) {
             sub.setState(StateC.STOPPED);
         }
+
+        // Wait for all threads to finish. If
         for (Thread t : this.subThreads) {
-            t.interrupt();
+            try {
+                // Try to join the thread. If the thread doesn't conclude within 200ms, interrupt it
+                this.logger.debug("Waiting for thread " + t + " to end");
+                t.join(200);
+                if (t.isAlive()) {
+                    this.logger.debug("Thread " +  t + " still alive, setting interrupt");
+                    t.interrupt();
+                }
+            } catch (InterruptedException ex) {
+                this.logger.debug("Thread " + t + " was interrupted unexpectedly while trying to join it: " + ex.getMessage());
+                StringBuilder sb = new StringBuilder();
+                for (var stel : ex.getStackTrace()) {
+                    sb.append("\n");
+                    sb.append("\t");
+                    sb.append(stel.toString());
+                }
+                this.logger.debug(sb.toString());
+                this.logger.debug("Setting interrupt on thread " + t + " to make sure it is dead");
+                t.interrupt();
+            }
         }
         this.setState(StateC.DESTROYED);
     }
 
+    /**
+     * Returns all answers and tries to delete them from the queue
+     * @return Answers from subscribers
+     */
     public HashMap<TopicC, ArrayList<MessageInfo>> getAndDeleteAnswers() {
         HashMap<TopicC, ArrayList<MessageInfo>> answers = this.answers;
         if (this.tryToAcquireLock("answer")) {

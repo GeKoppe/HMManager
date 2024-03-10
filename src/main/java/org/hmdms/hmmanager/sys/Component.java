@@ -1,5 +1,6 @@
 package org.hmdms.hmmanager.sys;
 
+import org.hmdms.hmmanager.core.HealthC;
 import org.hmdms.hmmanager.core.StateC;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,6 +13,7 @@ public abstract class Component {
      * State of the component
      */
     protected StateC state;
+    protected HealthC health;
     /**
      * Logger
      */
@@ -22,6 +24,7 @@ public abstract class Component {
      */
     public Component() {
         this.state = StateC.INITIALIZED;
+        this.health = HealthC.HEALTHY;
         this.logger = LoggerFactory.getLogger(this.getClass());
     }
 
@@ -39,5 +42,21 @@ public abstract class Component {
      */
     public void setState(StateC state) {
         this.state = state;
+    }
+
+    /**
+     * Gets health of the component
+     * @return Health of the component
+     */
+    public HealthC getHealth() {
+        return health;
+    }
+
+    /**
+     * Sets health of the component
+     * @param health New health of the component
+     */
+    public void setHealth(HealthC health) {
+        this.health = health;
     }
 }

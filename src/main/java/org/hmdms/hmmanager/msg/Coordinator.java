@@ -73,16 +73,22 @@ public class Coordinator implements Runnable {
     public void newMessage(TopicC topic, MessageInfo mi) {
         if (topic == null || mi == null) throw new IllegalArgumentException("No topic or message info given");
 
+        // Try to add answer to next broker. If it does not work, try the next broker instead
         int tries = 0;
         boolean dropped = false;
         while (!this.brokers.get(this.nextBroker).addMessage(topic, mi) && tries < 2*this.numOfBrokers) {
             this.nextBroker = (this.nextBroker + 1) % this.numOfBrokers;
             tries++;
+
+            // If after 2 iterations of all brokers the message could still not be delivered, mark it as dropped
+            // TODO check broker health in coordinator thread and if necessary redeploy them
             if (tries == 2*this.numOfBrokers) {
                 dropped = true;
+                break;
             }
         }
 
+        // Log that the message has been dropped
         if (dropped) {
             this.droppedMessages++;
             this.logger.debug("Message " + mi + " has been dropped due to brokers not being available");
@@ -114,16 +120,22 @@ public class Coordinator implements Runnable {
     public void setState(StateC state) { this.state = state; }
 
     /**
-     * Runs main logic of the coordinator. Can and should be run in a different thread
+     * Runs main logic of the coordinator. Can and should be run in a different thread.
+     * Loops through the entire logic over and over again, until the state of the coordinator is set to
+     * something else than StateC.WORKING
      */
     @Override
     public void run() {
         if (!this.state.equals(StateC.STARTED)) return;
         this.state = StateC.WORKING;
 
+        // Loop while the state of the component is still at WORKING
         while (this.state.equals(StateC.WORKING)) {
             try {
+                // Iterate through all brokers
                 for (Broker b : this.brokers) {
+
+                    // Notify all subscribers of the current broker of new messages
                     b.notifyAllSubscribers();
                     b.collectAnswersFromSubs();
                     HashMap<TopicC, ArrayList<MessageInfo>> answers = b.getAndDeleteAnswers();
@@ -149,6 +161,8 @@ public class Coordinator implements Runnable {
             }
         }
 
+        // When the thread is stopped, destroy all brokers. This will cause them to stop all subscribers
+        // and stop all of their threads
         for (Broker br : this.brokers) {
             br.destroy();
         }

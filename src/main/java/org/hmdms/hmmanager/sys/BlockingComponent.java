@@ -46,7 +46,7 @@ public abstract class BlockingComponent extends Component {
             if (this.locks.get(lockId) != null) {
                 throw new IllegalArgumentException("Duplicate lockId given");
             }
-            ReentrantLock newLock = new ReentrantLock();
+            ReentrantLock newLock = new ReentrantLock(true);
             this.locks.put(lockId, newLock);
         }
 

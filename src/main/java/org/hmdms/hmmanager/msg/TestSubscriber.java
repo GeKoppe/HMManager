@@ -6,14 +6,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.ReentrantLock;
 
 public class TestSubscriber extends BlockingComponent implements ISubscriber {
 
     private final Logger logger = LoggerFactory.getLogger(TestSubscriber.class);
     private final TopicC topic = TopicC.TEST;
-    private StateC state;
     private final ArrayList<MessageInfo> currentMessages;
     private final ArrayList<MessageInfo> answers;
     public TestSubscriber() {
@@ -36,15 +33,6 @@ public class TestSubscriber extends BlockingComponent implements ISubscriber {
         this.currentMessages.addAll(mi);
         this.unlock("cm");
         return true;
-    }
-
-    /**
-     *
-     * @return Current state of the subscriber
-     */
-    @Override
-    public StateC getState() {
-        return this.state;
     }
 
     @Override
@@ -92,9 +80,5 @@ public class TestSubscriber extends BlockingComponent implements ISubscriber {
         this.logger.debug("Removed answer " + mi + " from answer cache");
         this.unlock("answer");
         return true;
-    }
-    @Override
-    public void setState(StateC state) {
-        this.state = state;
     }
 }
