@@ -3,9 +3,6 @@ package org.hmdms.hmmanager.msg;
 import org.hmdms.hmmanager.core.StateC;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jms.annotation.JmsListener;
-import org.springframework.jms.core.JmsTemplate;
-import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -17,7 +14,6 @@ import java.util.Properties;
  * Entry point for messages into the system. Receives messages from other components, distributes them among
  * {@link Broker} objects and coordinates answering the messages when the job is finished
  */
-@Component
 public class Coordinator implements Runnable {
     /**
      * Current state of the coordinator
@@ -43,9 +39,15 @@ public class Coordinator implements Runnable {
      * Time in seconds before a message is dropped
      */
     private final int messageTimeout;
+    /**
+     * Signifies, whether new brokers should be added automatically when the system notices, that current number
+     * of brokers is not sufficient.
+     */
     private final boolean brokerAutoScaling;
+    /**
+     * Counter for number of messages, that could not be delivered to the brokers due to some problem.
+     */
     private int droppedMessages = 0;
-    private JmsTemplate tpl;
 
     /**
      * Standard constructor for Coordinator. Looks up number of brokers to instantiate from config.properties file and instantiates them.
@@ -56,6 +58,8 @@ public class Coordinator implements Runnable {
         String propFileName = "config.properties";
         InputStream inputStream = getClass().getClassLoader().getResourceAsStream(propFileName);
         prop.load(inputStream);
+
+        // Get configuration from config.properties
         this.numOfBrokers = Integer.parseInt(prop.getProperty("msg.scaling.brokers"));
         this.messageTimeout = Integer.parseInt(prop.getProperty("msg.timeout"));
         this.brokerAutoScaling = Boolean.parseBoolean(prop.getProperty("msg.scaling.brokers.autoScaling"));
@@ -96,9 +100,9 @@ public class Coordinator implements Runnable {
         // Log that the message has been dropped
         if (dropped) {
             this.droppedMessages++;
-            this.logger.debug("Message " + mi + " has been dropped due to brokers not being available");
+            this.logger.info("Message " + mi + " has been dropped due to brokers not being available");
             this.logger.info(this.droppedMessages + " have been dropped so far");
-        } else this.logger.debug("Added message info object to broker " + this.nextBroker + ": " + this.brokers.get(this.nextBroker).toString());
+        } else this.logger.trace("Added message info object to broker " + this.nextBroker + ": " + this.brokers.get(this.nextBroker).toString());
         this.nextBroker = (this.nextBroker + 1) % this.numOfBrokers;
     }
 
@@ -131,7 +135,10 @@ public class Coordinator implements Runnable {
      */
     @Override
     public void run() {
-        if (!this.state.equals(StateC.STARTED)) return;
+        if (this.state.equals(StateC.DESTROYED) || this.state.equals(StateC.INITIALIZED)) {
+            this.logger.debug(String.format("Cannot start coordinator, coordinator state is %s", this.state));
+            return;
+        }
         this.state = StateC.WORKING;
 
         // Loop while the state of the component is still at WORKING
@@ -194,18 +201,5 @@ public class Coordinator implements Runnable {
 
         this.state = StateC.STARTED;
         this.logger.debug("Coordinator is fully setup");
-    }
-
-    @JmsListener(destination = "coordinator", containerFactory = "hmmanagerFactory")
-    public void receiveMessage(JmsMessage mi) {
-        this.newMessage(mi.getTopic(), mi.getMi());
-    }
-
-    public JmsTemplate getTpl() {
-        return tpl;
-    }
-
-    public void setTpl(JmsTemplate tpl) {
-        this.tpl = tpl;
     }
 }

@@ -4,9 +4,6 @@ import org.hmdms.hmmanager.core.StateC;
 import org.hmdms.hmmanager.msg.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.SpringApplication;
-import org.springframework.context.ConfigurableApplicationContext;
-import org.springframework.jms.core.JmsTemplate;
 
 import java.util.HashMap;
 
@@ -20,10 +17,6 @@ public final class HMManager {
             Thread coordinatorThread = new Thread(co);
             coordinatorThread.start();
 
-            ConfigurableApplicationContext ctx = SpringApplication.run(JmsBroker.class);
-            JmsTemplate tpl = ctx.getBean(JmsTemplate.class);
-            co.setTpl(tpl);
-
             boolean currentlyTest = false;
             while (true) {
                 Thread.sleep(500);
@@ -34,7 +27,6 @@ public final class HMManager {
                 hm.put("Hello", "World");
                 hm.put("Moin", "Welt");
                 mi.setInformation(hm);
-                tpl.convertAndSend("coordinator",  new JmsMessage(currentlyTest ? TopicC.TEST : TopicC.LOGIN, mi));
                 currentlyTest = !currentlyTest;
             }
         } catch (Exception ex) {
