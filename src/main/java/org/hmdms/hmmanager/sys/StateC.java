@@ -1,4 +1,4 @@
-package org.hmdms.hmmanager.core;
+package org.hmdms.hmmanager.sys;
 
 /**
  * Defines states for various components in the system

@@ -1,6 +1,6 @@
 package org.hmdms.hmmanager.msg;
 
-import org.hmdms.hmmanager.core.StateC;
+import org.hmdms.hmmanager.sys.StateC;
 import org.hmdms.hmmanager.sys.BlockingComponent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -340,6 +340,9 @@ public class Broker extends BlockingComponent {
         HashMap<TopicC, ArrayList<MessageInfo>> answers = this.answers;
         if (this.tryToAcquireLock("answer")) {
             this.answers.clear();
+        }
+        for (var key : this.answers.keySet()) {
+            this.answers.get(key).trimToSize();
         }
         this.unlock("answer");
         return answers;

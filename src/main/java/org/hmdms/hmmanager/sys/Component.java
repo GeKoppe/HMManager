@@ -1,9 +1,9 @@
 package org.hmdms.hmmanager.sys;
 
-import org.hmdms.hmmanager.core.HealthC;
-import org.hmdms.hmmanager.core.StateC;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.HashMap;
 
 /**
  * Class represents a basic system component
@@ -13,11 +13,16 @@ public abstract class Component {
      * State of the component
      */
     protected StateC state;
+    /**
+     * Health of the component
+     */
     protected HealthC health;
     /**
      * Logger
      */
     private final Logger logger;
+
+    private final HashMap<String, PerformanceCheck> performance;
 
     /**
      * Default constructor
@@ -26,6 +31,7 @@ public abstract class Component {
         this.state = StateC.INITIALIZED;
         this.health = HealthC.HEALTHY;
         this.logger = LoggerFactory.getLogger(this.getClass());
+        this.performance = new HashMap<>();
     }
 
     /**
@@ -58,5 +64,36 @@ public abstract class Component {
      */
     public void setHealth(HealthC health) {
         this.health = health;
+    }
+
+    public void addPerformanceCheck(String id) throws IllegalArgumentException {
+        if (id == null || id.isEmpty()) {
+            throw new IllegalArgumentException("No id given");
+        }
+
+        if (this.performance.get(id) != null) {
+            throw new IllegalArgumentException("Performance id already exists");
+        }
+
+        this.performance.put(id, new PerformanceCheck());
+    }
+
+    protected void startOperation(String id) throws IllegalArgumentException {
+        if (this.performance.get((id)) == null) {
+            throw new IllegalArgumentException(String.format("No performancechecker with id %s exists", id));
+        }
+        this.performance.get(id).startOperation();
+    }
+
+    /**
+     * Ends operation with given id and returns duration of that operation
+     * @param id ID of the performance checker which should end the operation
+     * @return Duration of the operation in milliseconds
+     */
+    protected int endOperation(String id) {
+        if (this.performance.get((id)) == null) {
+            throw new IllegalArgumentException(String.format("No performancechecker with id %s exists", id));
+        }
+        return this.performance.get(id).endOperation();
     }
 }

@@ -1,6 +1,6 @@
 package org.hmdms.hmmanager;
 
-import org.hmdms.hmmanager.core.StateC;
+import org.hmdms.hmmanager.sys.StateC;
 import org.hmdms.hmmanager.msg.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

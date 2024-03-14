@@ -1,6 +1,7 @@
 package org.hmdms.hmmanager.msg;
 
-import org.hmdms.hmmanager.core.StateC;
+import org.hmdms.hmmanager.sys.StateC;
+import org.hmdms.hmmanager.sys.BlockingComponent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,7 +15,7 @@ import java.util.Properties;
  * Entry point for messages into the system. Receives messages from other components, distributes them among
  * {@link Broker} objects and coordinates answering the messages when the job is finished
  */
-public class Coordinator implements Runnable {
+public class Coordinator extends BlockingComponent implements Runnable {
     /**
      * Current state of the coordinator
      */
@@ -54,6 +55,7 @@ public class Coordinator implements Runnable {
      * @throws IOException When config.properties file is not found
      */
     public Coordinator() throws IOException {
+        super(new String[]{"brokers"});
         Properties prop = new Properties();
         String propFileName = "config.properties";
         InputStream inputStream = getClass().getClassLoader().getResourceAsStream(propFileName);
@@ -189,11 +191,13 @@ public class Coordinator implements Runnable {
     public void setup() {
         this.logger.debug("Setting up coordinator");
         this.logger.debug("Adding brokers");
+        this.tryToAcquireLock("brokers");
 
         // Setup all brokers
         for (int i = 0; i < this.numOfBrokers; i++) {
             this.brokers.add(new Broker());
         }
+        this.unlock("brokers");
 
         for (Broker br : this.brokers) {
             br.addSubscriber(new TestSubscriber());
