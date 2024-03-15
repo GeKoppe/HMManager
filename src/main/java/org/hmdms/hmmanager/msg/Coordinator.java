@@ -207,6 +207,7 @@ public class Coordinator extends BlockingComponent implements Runnable {
     private void checkAndRedeployBrokers() {
         if (!this.tryToAcquireLock("brokers")) return;
         ArrayList<Broker> toDelete = new ArrayList<>();
+        // TODO implement health check correctly
         for (Broker b : this.brokers) {
             b.checkOwnHealth();
             if (b.getHealth().compareTo(HealthC.SLOW) >=0) {
@@ -224,7 +225,6 @@ public class Coordinator extends BlockingComponent implements Runnable {
             newB.addSubscriber(new TestSubscriber());
             this.brokers.add(newB);
         }
-
         this.unlock("brokers");
     }
 }

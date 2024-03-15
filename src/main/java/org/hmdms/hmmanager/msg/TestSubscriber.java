@@ -7,17 +7,10 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 
-public class TestSubscriber extends BlockingComponent implements ISubscriber {
-    
-    private final TopicC topic = TopicC.TEST;
-    private final ArrayList<MessageInfo> currentMessages;
-    private final ArrayList<MessageInfo> answers;
+public class TestSubscriber extends Subscriber {
+
     public TestSubscriber() {
         super(new String[]{"answer", "cm"});
-        this.currentMessages = new ArrayList<>();
-        this.answers = new ArrayList<>();
-
-        this.state = StateC.STARTED;
     }
 
 
