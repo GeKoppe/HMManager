@@ -3,8 +3,6 @@ package org.hmdms.hmmanager.msg;
 import org.hmdms.hmmanager.sys.HealthC;
 import org.hmdms.hmmanager.sys.StateC;
 import org.hmdms.hmmanager.sys.BlockingComponent;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
