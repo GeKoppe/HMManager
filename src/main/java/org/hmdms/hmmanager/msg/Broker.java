@@ -1,5 +1,7 @@
 package org.hmdms.hmmanager.msg;
 
+import org.hmdms.hmmanager.sys.HealthC;
+import org.hmdms.hmmanager.sys.PerformanceCheck;
 import org.hmdms.hmmanager.sys.StateC;
 import org.hmdms.hmmanager.sys.BlockingComponent;
 import org.slf4j.Logger;
@@ -12,11 +14,6 @@ import java.util.*;
  * subscribe to this class
  */
 public class Broker extends BlockingComponent {
-    /**
-     * Logger
-     */
-    private final Logger logger = LoggerFactory.getLogger(Broker.class);
-
     /**
      * All messages, sorted by topic
      */
@@ -346,5 +343,28 @@ public class Broker extends BlockingComponent {
         }
         this.unlock("answer");
         return answers;
+    }
+
+    /**
+     * Iterates through all Performance Checkers in {@link org.hmdms.hmmanager.sys.Component#performance} and determines
+     * whether
+     */
+    public void checkOwnHealth() {
+        HealthC base = this.health;
+        for (String key : this.performance.keySet()) {
+            PerformanceCheck p = this.performance.get(key);
+
+            float performanceIndicator = (float) (p.getAverageOperationTime() / p.getBaselineTime());
+            if (performanceIndicator > 4F) {
+                base = HealthC.TROUBLED.compareTo(base) > 0 ? HealthC.TROUBLED : base;
+            } else if (performanceIndicator > 2F) {
+                base = HealthC.SLOW.compareTo(base) > 0 ? HealthC.SLOW : base;
+            } else if (performanceIndicator >= 1F) {
+                base = HealthC.HEALTHY.compareTo(base) >= 0 ? HealthC.HEALTHY : base;
+            } else {
+                base = HealthC.OVERACHIEVING;
+            }
+        }
+        this.health = base;
     }
 }

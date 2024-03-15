@@ -1,5 +1,6 @@
 package org.hmdms.hmmanager.msg;
 
+import org.hmdms.hmmanager.sys.HealthC;
 import org.hmdms.hmmanager.sys.StateC;
 import org.hmdms.hmmanager.sys.BlockingComponent;
 import org.slf4j.Logger;
@@ -20,10 +21,6 @@ public class Coordinator extends BlockingComponent implements Runnable {
      * Current state of the coordinator
      */
     private StateC state;
-    /**
-     * Logger
-     */
-    private final Logger logger = LoggerFactory.getLogger(Coordinator.class);
     /**
      * List of all instantiated {@link Broker} objects
      */
@@ -205,5 +202,29 @@ public class Coordinator extends BlockingComponent implements Runnable {
 
         this.state = StateC.STARTED;
         this.logger.debug("Coordinator is fully setup");
+    }
+
+    private void checkAndRedeployBrokers() {
+        if (!this.tryToAcquireLock("brokers")) return;
+        ArrayList<Broker> toDelete = new ArrayList<>();
+        for (Broker b : this.brokers) {
+            b.checkOwnHealth();
+            if (b.getHealth().compareTo(HealthC.SLOW) >=0) {
+                b.destroy();
+                b.collectAnswersFromSubs();
+                HashMap<TopicC, ArrayList<MessageInfo>> answers = b.getAndDeleteAnswers();
+                // TODO cache the answers
+
+                toDelete.add(b);
+            }
+        }
+        this.brokers.removeAll(toDelete);
+        for (int i = 0; i < toDelete.size(); i++) {
+            Broker newB = new Broker();
+            newB.addSubscriber(new TestSubscriber());
+            this.brokers.add(newB);
+        }
+
+        this.unlock("brokers");
     }
 }

@@ -8,8 +8,7 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 
 public class TestSubscriber extends BlockingComponent implements ISubscriber {
-
-    private final Logger logger = LoggerFactory.getLogger(TestSubscriber.class);
+    
     private final TopicC topic = TopicC.TEST;
     private final ArrayList<MessageInfo> currentMessages;
     private final ArrayList<MessageInfo> answers;

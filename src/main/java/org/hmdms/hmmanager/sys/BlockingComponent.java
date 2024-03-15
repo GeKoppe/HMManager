@@ -19,10 +19,6 @@ public abstract class BlockingComponent extends Component {
      */
     private final HashMap<String, ReentrantLock> locks;
     /**
-     * Logger
-     */
-    private final Logger logger;
-    /**
      * Default constructor for BlockingComponent
      * @param lockIds Ids for all locks that should be instantiated
      * @throws IllegalArgumentException When no lockIds are given, an entry in {@param lockIds} is empty
@@ -49,8 +45,6 @@ public abstract class BlockingComponent extends Component {
             ReentrantLock newLock = new ReentrantLock(true);
             this.locks.put(lockId, newLock);
         }
-
-        this.logger = LoggerFactory.getLogger(this.getClass());
     }
 
     /**

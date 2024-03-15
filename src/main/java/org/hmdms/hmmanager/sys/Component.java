@@ -20,9 +20,9 @@ public abstract class Component {
     /**
      * Logger
      */
-    private final Logger logger;
+    protected final Logger logger;
 
-    private final HashMap<String, PerformanceCheck> performance;
+    protected final HashMap<String, PerformanceCheck> performance;
 
     /**
      * Default constructor
