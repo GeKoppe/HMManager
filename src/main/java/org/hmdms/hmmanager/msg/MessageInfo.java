@@ -127,7 +127,7 @@ public class MessageInfo implements Serializable {
         return "MessageInfo{" +
                 "uuid='" + uuid + '\'' +
                 ", received=" + received +
-                ", information=" + jsonMessage +
+                ", jsonMessage='" + jsonMessage + '\'' +
                 ", collected=" + collected +
                 ", collectionDate=" + collectionDate +
                 '}';

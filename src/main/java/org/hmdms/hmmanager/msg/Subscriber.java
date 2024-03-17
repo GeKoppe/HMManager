@@ -1,8 +1,10 @@
 package org.hmdms.hmmanager.msg;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.*;
 import org.hmdms.hmmanager.sys.BlockingComponent;
 import org.hmdms.hmmanager.sys.StateC;
+import org.hmdms.hmmanager.utils.LoggingUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,10 +25,6 @@ public abstract class Subscriber extends BlockingComponent implements ISubscribe
      */
     protected final ArrayList<MessageInfo> currentMessages;
     /**
-     * Answers to the messages in the {@link Subscriber#currentMessages} list
-     */
-    protected final ArrayList<MessageInfo> answers;
-    /**
      * Topic the Subscriber subscribes to
      */
     protected TopicC topic;
@@ -43,7 +41,6 @@ public abstract class Subscriber extends BlockingComponent implements ISubscribe
         super(lockIds);
         this.logger = LoggerFactory.getLogger(this.getClass());
         this.currentMessages = new ArrayList<>();
-        this.answers = new ArrayList<>();
         this.state = StateC.INITIALIZED;
         this.connectionFactory = conn;
     }
@@ -65,23 +62,24 @@ public abstract class Subscriber extends BlockingComponent implements ISubscribe
         this.topic = topic;
     }
 
-    protected void answerRequest(BasicProperties props, Serializable answerObj) {
+    protected boolean answerRequest(BasicProperties props, Serializable answerObj) {
         try (Connection conn = this.connectionFactory.newConnection(); Channel channel = conn.createChannel()) {
             AMQP.BasicProperties replyProps = new AMQP.BasicProperties
                     .Builder()
                     .correlationId(props.getCorrelationId())
                     .build();
 
+            String jsonString = new ObjectMapper().writeValueAsString(answerObj);
             channel.basicPublish(
                     "",
                     props.getReplyTo(),
                     replyProps,
-                    answerObj.toString().getBytes(StandardCharsets.UTF_8)
+                    jsonString.getBytes(StandardCharsets.UTF_8)
             );
+            return true;
         } catch (Exception ex) {
-
-        } finally {
-
+            LoggingUtils.logException(ex, this.logger, "info", "%s occurred while trying to answer rpc request: %s");
+            return false;
         }
     }
 }

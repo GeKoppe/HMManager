@@ -9,13 +9,9 @@
         </File>
     </Appenders>
     <Loggers>
-        <Root level="warn">
+        <Root level="debug" additivity="false">
             <AppenderRef ref="ConsoleAppender"/>
             <AppenderRef ref="FileAppender"/>
         </Root>
-        <Logger name="org.hmdms" level="debug">
-            <AppenderRef ref="ConsoleAppender"/>
-            <AppenderRef ref="FileAppender"/>
-        </Logger>
     </Loggers>
 </Configuration>

@@ -11,7 +11,6 @@ import org.hmdms.hmmanager.utils.LoggingUtils;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Properties;
 
 /**
@@ -105,10 +104,10 @@ public class Coordinator extends BlockingComponent implements Runnable {
                 throw new IllegalArgumentException("No message body given in json message");
             }
 
-            TopicC mTopic = TopicC.valueOf(node.get("topic").toString());
+            TopicC mTopic = TopicC.valueOf(node.get("topic").asText());
 
             MessageInfo mi = MessageInfoFactory.createDefaultMessageInfo();
-            mi.setJsonMessage(node.get("message").toString());
+            mi.setJsonMessage(node.get("message").asText());
             mi.setMessageProps(props);
             this.logger.debug("Created MessageInfo object for executing task");
 
@@ -178,6 +177,7 @@ public class Coordinator extends BlockingComponent implements Runnable {
      */
     @Override
     public void run() {
+        this.setup();
         if (this.state.equals(StateC.DESTROYED) || this.state.equals(StateC.INITIALIZED)) {
             this.logger.debug(String.format("Cannot start coordinator, coordinator state is %s", this.state));
             return;
@@ -186,18 +186,22 @@ public class Coordinator extends BlockingComponent implements Runnable {
         this.logger.debug("Setting up message queue consumer");
         ConnectionFactory factory = new ConnectionFactory();
         factory.setHost(this.mqHost);
-
+        Connection conn = null;
+        Channel channel = null;
         // Set up consumer
-        try (Connection conn = factory.newConnection(); Channel channel = conn.createChannel()) {
+        try {
+            conn = factory.newConnection();
+            channel = conn.createChannel();
             channel.queueDeclare(this.queueName, false, false, false, null);
+            Channel finalChannel = channel;
             DeliverCallback deliverCallback = (consumerTag, delivery) -> {
                 this.logger.debug("Received new message, start handling");
                 String message = new String(delivery.getBody(), StandardCharsets.UTF_8);
                 this.newMessage(message, delivery.getProperties());
-                channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
+                finalChannel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
                 this.logger.debug("Acknowledged message");
             };
-            channel.basicConsume(this.queueName, true, deliverCallback, consumerTag -> { });
+            channel.basicConsume(this.queueName, false, deliverCallback, (consumerTag -> { }));
         } catch (Exception ex) {
             LoggingUtils.logException(
                     ex,
@@ -221,14 +225,14 @@ public class Coordinator extends BlockingComponent implements Runnable {
                     // Respond to all messages that weren't yet distributed
                     for (MessageInfo mi : cleanedMessages) {
                         this.logger.warn(String.format("Message %s was not distributed to a subscriber yet and was therefore cleaned", mi.toString()));
-                        try (Connection conn = this.factory.newConnection(); Channel channel = conn.createChannel()) {
+                        try (Connection connection = this.factory.newConnection(); Channel chann = connection.createChannel()) {
                             AMQP.BasicProperties replyProps = new AMQP.BasicProperties
                                             .Builder()
                                             .correlationId(mi.getMessageProps().getCorrelationId())
                                             .build();
 
                             // TODO build the answer object
-                            channel.basicPublish("", mi.getMessageProps().getReplyTo(), replyProps, "fail".getBytes(StandardCharsets.UTF_8));
+                            chann.basicPublish("", mi.getMessageProps().getReplyTo(), replyProps, "fail".getBytes(StandardCharsets.UTF_8));
                         } catch (Exception ex) {
                             LoggingUtils.logException(ex, this.logger, "warn");
                         }
@@ -250,7 +254,12 @@ public class Coordinator extends BlockingComponent implements Runnable {
         for (Broker br : this.brokers) {
             br.destroy();
         }
+        try {
+            if (channel != null) channel.close();
+            if (conn != null) conn.close();
+        } catch (Exception ex) {
 
+        }
         this.logger.debug("Coordinator stopped");
         this.state = StateC.STOPPED;
     }

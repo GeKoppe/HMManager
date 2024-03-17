@@ -1,5 +1,6 @@
 package org.hmdms.hmmanager.msg;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.ConnectionFactory;
 import org.hmdms.hmmanager.sys.StateC;
 import org.hmdms.hmmanager.sys.BlockingComponent;
@@ -9,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 
 public class TestSubscriber extends Subscriber {
+    private final TopicC topic = TopicC.TEST;
 
     public TestSubscriber(ConnectionFactory conn) {
         super(new String[]{"answer", "cm"}, conn);
@@ -40,9 +42,10 @@ public class TestSubscriber extends Subscriber {
                     this.logger.debug("Deleted message " + m + " from currentMessages, adding answer");
                     MessageInfo answer = MessageInfoFactory.createDefaultMessageInfo();
                     answer.setUuid(m.getUuid());
-                    if (this.answers.add(answer)) {
-                        toDelete.add(m);
-                    }
+                    String answerContent = "Worked";
+                    answer.setJsonMessage(new ObjectMapper().writeValueAsString(answerContent));
+                    this.answerRequest(m.getMessageProps(), answer);
+                    toDelete.add(m);
                     this.unlock("cm");
                     this.logger.debug("Added answer");
                 }
@@ -59,19 +62,5 @@ public class TestSubscriber extends Subscriber {
                 this.unlock("cm");
             }
         }
-    }
-
-    @Override
-    public ArrayList<MessageInfo> getAnswers() {
-        return this.answers;
-    }
-
-    @Override
-    public boolean removeAnswer(MessageInfo mi) {
-        if (!this.tryToAcquireLock("answer")) return false;
-        this.answers.remove(mi);
-        this.logger.debug("Removed answer " + mi + " from answer cache");
-        this.unlock("answer");
-        return true;
     }
 }

@@ -21,13 +21,5 @@ public interface ISubscriber extends Runnable {
      */
     TopicC getTopic();
 
-    /**
-     * Method used to collect all answers from the subscriber
-     * @return Answers the subscriber compiled
-     */
-    ArrayList<MessageInfo> getAnswers();
-
     void setState(StateC state);
-
-    boolean removeAnswer(MessageInfo mi);
 }
