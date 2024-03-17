@@ -1,5 +1,6 @@
 package org.hmdms.hmmanager.msg;
 
+import com.rabbitmq.client.ConnectionFactory;
 import org.hmdms.hmmanager.sys.StateC;
 import org.hmdms.hmmanager.sys.BlockingComponent;
 import org.slf4j.Logger;
@@ -9,8 +10,8 @@ import java.util.ArrayList;
 
 public class TestSubscriber extends Subscriber {
 
-    public TestSubscriber() {
-        super(new String[]{"answer", "cm"});
+    public TestSubscriber(ConnectionFactory conn) {
+        super(new String[]{"answer", "cm"}, conn);
     }
 
 

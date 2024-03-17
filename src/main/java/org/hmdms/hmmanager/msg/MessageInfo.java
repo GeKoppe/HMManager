@@ -6,7 +6,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.UUID;
 
 /**
@@ -27,13 +26,9 @@ public class MessageInfo implements Serializable {
      */
     private Date received;
     /**
-     * Where the message came from
-     */
-    private String from;
-    /**
      * Information in the message
      */
-    private HashMap<String,String> information;
+    private String jsonMessage;
     /**
      * Shows, whether the message was collected by a subscriber. Used by {@link Broker} class.
      */
@@ -44,7 +39,8 @@ public class MessageInfo implements Serializable {
     private Date collectionDate;
     /**
      * Properties of the rabbitmq message.
-     * In order to be able to reply to the rpc message, {@link BasicProperties#getReplyTo()} must not be empty
+     * In order to be able to reply to the rpc message, {@link BasicProperties#getReplyTo()} must not return null or
+     * an empty string
      */
     private BasicProperties messageProps;
 
@@ -56,24 +52,21 @@ public class MessageInfo implements Serializable {
 
         this.uuid = UUID.randomUUID().toString();
         this.received = new Date();
-
-        this.from = "";
-        this.information = new HashMap<>();
         this.collected = false;
+        this.collectionDate = null;
     }
 
     /**
      * Constructor for the MessageInfo object
-     * @param from Sender of the message
-     * @param information Information that is transported by the message
      */
-    public MessageInfo(String from, HashMap<String, String> information) {
-        if (from == null || from.isEmpty()) throw new IllegalArgumentException("No sender given in from argument");
-        if (information == null || information.isEmpty()) throw new IllegalArgumentException("No information about message given");
+    public MessageInfo(BasicProperties props) {
+        this();
+        this.messageProps = props;
+    }
 
-        this.uuid = UUID.randomUUID().toString();
-        this.from = from;
-        this.information = information;
+    public MessageInfo(BasicProperties props, String jsonMessage) {
+        this(props);
+        this.jsonMessage = jsonMessage;
     }
 
     /**
@@ -109,38 +102,6 @@ public class MessageInfo implements Serializable {
     }
 
     /**
-     * Gets sender of the message
-     * @return Sender of the message
-     */
-    public String getFrom() {
-        return from;
-    }
-
-    /**
-     * Sets sender of the message
-     * @param from sender of the message
-     */
-    public void setFrom(String from) {
-        this.from = from;
-    }
-
-    /**
-     * Gets information to be conveyed by the message
-     * @return information to be conveyed by the message
-     */
-    public HashMap<String, String> getInformation() {
-        return information;
-    }
-
-    /**
-     * Sets information to be conveyed by the message
-     * @param information information to be conveyed by the message
-     */
-    public void setInformation(HashMap<String, String> information) {
-        this.information = information;
-    }
-
-    /**
      * Checks, whether the message has been collected by an object that works with it's information
      * @return true, if the message has been collected by an object that works with it's information, false otherwise
      */
@@ -166,8 +127,7 @@ public class MessageInfo implements Serializable {
         return "MessageInfo{" +
                 "uuid='" + uuid + '\'' +
                 ", received=" + received +
-                ", from='" + from + '\'' +
-                ", information=" + information +
+                ", information=" + jsonMessage +
                 ", collected=" + collected +
                 ", collectionDate=" + collectionDate +
                 '}';
@@ -203,5 +163,13 @@ public class MessageInfo implements Serializable {
      */
     public void setMessageProps(BasicProperties messageProps) {
         this.messageProps = messageProps;
+    }
+
+    public String getJsonMessage() {
+        return jsonMessage;
+    }
+
+    public void setJsonMessage(String jsonMessage) {
+        this.jsonMessage = jsonMessage;
     }
 }

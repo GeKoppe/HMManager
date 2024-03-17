@@ -1,9 +1,8 @@
 package org.hmdms.hmmanager.msg;
 
-import com.rabbitmq.client.Channel;
-import com.rabbitmq.client.Connection;
-import com.rabbitmq.client.ConnectionFactory;
-import com.rabbitmq.client.DeliverCallback;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rabbitmq.client.*;
 import org.hmdms.hmmanager.sys.HealthC;
 import org.hmdms.hmmanager.sys.StateC;
 import org.hmdms.hmmanager.sys.BlockingComponent;
@@ -14,7 +13,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Properties;
-import java.util.concurrent.TimeoutException;
 
 /**
  * Entry point for messages into the system. Receives messages from other components, distributes them among
@@ -50,14 +48,25 @@ public class Coordinator extends BlockingComponent implements Runnable {
      * Counter for number of messages, that could not be delivered to the brokers due to some problem.
      */
     private int droppedMessages = 0;
+    /**
+     * Name of the message queue which the coordinator subscribes to.
+     * Name of the queue is defined in config.properties file in property mq.hmmanager.queue.name
+     */
     private final String queueName;
+    /**
+     * Host on which the rabbitmq service is active
+     */
     private final String mqHost;
+    /**
+     * Factory for creating connections to the rabbitmq service
+     */
+    private final ConnectionFactory factory = new ConnectionFactory();
 
     /**
      * Standard constructor for Coordinator. Looks up number of brokers to instantiate from config.properties file and instantiates them.
      * @throws IOException When config.properties file is not found
      */
-    public Coordinator() throws IOException, TimeoutException {
+    public Coordinator() throws IOException {
         super(new String[]{"brokers"});
         Properties prop = new Properties();
         String propFileName = "config.properties";
@@ -68,7 +77,7 @@ public class Coordinator extends BlockingComponent implements Runnable {
         this.numOfBrokers = Integer.parseInt(prop.getProperty("msg.scaling.brokers"));
         this.messageTimeout = Integer.parseInt(prop.getProperty("msg.timeout"));
         this.brokerAutoScaling = Boolean.parseBoolean(prop.getProperty("msg.scaling.brokers.autoScaling"));
-        this.queueName = prop.get("mq.coordinator.name").toString();
+        this.queueName = prop.get("mq.hmmanager.queue.name").toString();
         this.mqHost = prop.get("mq.host").toString();
 
         this.brokers = new ArrayList<>();
@@ -77,16 +86,33 @@ public class Coordinator extends BlockingComponent implements Runnable {
         }
         logger.debug("Working with " + this.numOfBrokers + " brokers");
 
+        this.factory.setHost(this.mqHost);
+
         this.nextBroker = 0;
         this.state = StateC.INITIALIZED;
     }
 
-    private void newMessage(byte[] message) {
-        ByteArrayInputStream bi = new ByteArrayInputStream(message);
-        try (ObjectInputStream oi = new ObjectInputStream(bi) ) {
-            MessageInfo mi = (MessageInfo) oi.readObject();
-            oi.close();
-            this.newMessage(TopicC.TEST, mi);
+    private void newMessage(String message, BasicProperties props) {
+        this.logger.debug("Parsing json message into MessageInfo object");
+        try {
+            JsonNode node = new ObjectMapper().readTree(message);
+            if (!node.has("topic")) {
+                this.logger.info("Incomplete message received, no topic given");
+                throw new IllegalArgumentException("No topic given in json message");
+            }
+            if (!node.has("message")) {
+                this.logger.info("Incomplete message received, no message body given");
+                throw new IllegalArgumentException("No message body given in json message");
+            }
+
+            TopicC mTopic = TopicC.valueOf(node.get("topic").toString());
+
+            MessageInfo mi = MessageInfoFactory.createDefaultMessageInfo();
+            mi.setJsonMessage(node.get("message").toString());
+            mi.setMessageProps(props);
+            this.logger.debug("Created MessageInfo object for executing task");
+
+            this.newMessage(mTopic, mi);
         } catch (Exception ex) {
             LoggingUtils.logException(ex, this.logger, "info", "Message could not be deserialized due to an %s: %s");
         }
@@ -161,11 +187,15 @@ public class Coordinator extends BlockingComponent implements Runnable {
         ConnectionFactory factory = new ConnectionFactory();
         factory.setHost(this.mqHost);
 
+        // Set up consumer
         try (Connection conn = factory.newConnection(); Channel channel = conn.createChannel()) {
             channel.queueDeclare(this.queueName, false, false, false, null);
             DeliverCallback deliverCallback = (consumerTag, delivery) -> {
-                byte[] message = delivery.getBody();
-                this.newMessage(message);
+                this.logger.debug("Received new message, start handling");
+                String message = new String(delivery.getBody(), StandardCharsets.UTF_8);
+                this.newMessage(message, delivery.getProperties());
+                channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
+                this.logger.debug("Acknowledged message");
             };
             channel.basicConsume(this.queueName, true, deliverCallback, consumerTag -> { });
         } catch (Exception ex) {
@@ -173,9 +203,8 @@ public class Coordinator extends BlockingComponent implements Runnable {
                     ex,
                     this.logger,
                     "warn",
-                    "%s occurred  while trying to setup the message queue: %s"
+                    "%s occurred while trying to setup the message queue consumer: %s"
             );
-            return;
         }
 
         // Loop while the state of the component is still at WORKING
@@ -185,17 +214,24 @@ public class Coordinator extends BlockingComponent implements Runnable {
                 for (Broker b : this.brokers) {
                     // Notify all subscribers of the current broker of new messages
                     b.notifyAllSubscribers();
-                    b.collectAnswersFromSubs();
-                    HashMap<TopicC, ArrayList<MessageInfo>> answers = b.getAndDeleteAnswers();
 
-                    for (TopicC top : answers.keySet()) {
-                        for (MessageInfo mi : answers.get(top)) {
-                            this.logger.debug("Answer from broker: " + mi.toString());
-                        }
-                    }
+                    // Get all messages that weren't distributed yet
                     ArrayList<MessageInfo> cleanedMessages = b.cleanup(this.messageTimeout);
+
+                    // Respond to all messages that weren't yet distributed
                     for (MessageInfo mi : cleanedMessages) {
-                        this.logger.info("Cleaned up message: " + mi.toString());
+                        this.logger.warn(String.format("Message %s was not distributed to a subscriber yet and was therefore cleaned", mi.toString()));
+                        try (Connection conn = this.factory.newConnection(); Channel channel = conn.createChannel()) {
+                            AMQP.BasicProperties replyProps = new AMQP.BasicProperties
+                                            .Builder()
+                                            .correlationId(mi.getMessageProps().getCorrelationId())
+                                            .build();
+
+                            // TODO build the answer object
+                            channel.basicPublish("", mi.getMessageProps().getReplyTo(), replyProps, "fail".getBytes(StandardCharsets.UTF_8));
+                        } catch (Exception ex) {
+                            LoggingUtils.logException(ex, this.logger, "warn");
+                        }
                     }
                 }
             } catch (Exception ex) {
@@ -234,7 +270,7 @@ public class Coordinator extends BlockingComponent implements Runnable {
         this.unlock("brokers");
 
         for (Broker br : this.brokers) {
-            br.addSubscriber(new TestSubscriber());
+            br.addSubscriber(new TestSubscriber(this.factory));
         }
 
         this.state = StateC.STARTED;
@@ -249,17 +285,13 @@ public class Coordinator extends BlockingComponent implements Runnable {
             b.checkOwnHealth();
             if (b.getHealth().compareTo(HealthC.SLOW) >=0) {
                 b.destroy();
-                b.collectAnswersFromSubs();
-                HashMap<TopicC, ArrayList<MessageInfo>> answers = b.getAndDeleteAnswers();
-                // TODO cache the answers
-
                 toDelete.add(b);
             }
         }
         this.brokers.removeAll(toDelete);
         for (int i = 0; i < toDelete.size(); i++) {
             Broker newB = new Broker();
-            newB.addSubscriber(new TestSubscriber());
+            newB.addSubscriber(new TestSubscriber(this.factory));
             this.brokers.add(newB);
         }
         this.unlock("brokers");

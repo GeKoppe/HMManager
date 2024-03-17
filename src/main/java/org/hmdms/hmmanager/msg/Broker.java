@@ -22,10 +22,6 @@ public class Broker extends BlockingComponent {
      * All subscribers that subscribe to this broker
      */
     private final ArrayList<ISubscriber> subscribers;
-    /**
-     * Answers collected from subscribers
-     */
-    private final HashMap<TopicC, ArrayList<MessageInfo>> answers;
 
     /**
      * Threads of all subscribers to this broker
@@ -38,11 +34,10 @@ public class Broker extends BlockingComponent {
      * @throws IllegalArgumentException Exception thrown by super constructor
      */
     public Broker () throws IllegalArgumentException {
-        super(new String[]{"mq", "answer", "sub", "thread"});
+        super(new String[]{"mq", "sub", "thread"});
         this.mq = new HashMap<>();
         this.subscribers = new ArrayList<>();
         this.setState(StateC.STARTED);
-        this.answers = new HashMap<>();
         this.subThreads = new LinkedList<>();
         this.logger.debug("Broker instantiated");
     }
@@ -132,7 +127,6 @@ public class Broker extends BlockingComponent {
                     }
                 }
             }
-            this.unlock("mq");
             return true;
         } catch (Exception ex) {
             this.logger.info("Could notify subscribers due to exception: " + ex.getMessage());
@@ -142,9 +136,10 @@ public class Broker extends BlockingComponent {
                 sb.append("\n");
                 sb.append("\t");
             }
-            this.unlock("mq");
             this.logger.debug(sb.toString());
             return false;
+        } finally {
+            this.unlock("mq");
         }
 
     }
@@ -182,27 +177,22 @@ public class Broker extends BlockingComponent {
      * @return All cleaned messages, because the coordinator still has to answer them
      */
     public ArrayList<MessageInfo> cleanup(int timeoutSeconds) {
-        if (!this.tryToAcquireLock("mq")) return null;
         try {
+            if (!this.tryToAcquireLock("mq")) return null;
             ArrayList<MessageInfo> cleaned = new ArrayList<>();
             // Iterate through all topics
             for (TopicC t : this.mq.keySet()) {
                 ArrayList<MessageInfo> tCleaned = new ArrayList<>();
+                ArrayList<MessageInfo> aCleaned = new ArrayList<>();
                 LinkedList<MessageInfo> currentQueue = this.mq.get(t);
                 // Iterate through all messages in that topic
                 for (MessageInfo m : currentQueue) {
                     // If message was already collected, check the collection date
                     if (m.isCollected()) {
-                        Date collectionDate = m.getCollectionDate();
-                        if (collectionDate == null) {
-                            continue;
-                        }
-
-                        // If collection date is longer ago than timeoutSeconds, remove the message from the queue
-                        if (((int) (new Date().getTime() - collectionDate.getTime()) / 1000) > timeoutSeconds) {
-                            this.logger.info("Message " + m + " is being cleaned up as it has not finished after timeout");
-                            tCleaned.add(m);
-                        }
+                        /* TODO think about how to monitor which messages, have been collected, were not answered yet
+                            and what to do with those
+                         */
+                        aCleaned.add(m);
                     } else if (((int) (new Date().getTime() - m.getReceived().getTime()) / 1000) > timeoutSeconds) {
                         // If the message has not been collected, check the received time instead
                         this.logger.info("Message " + m + " is being cleaned up as it has not finished after timeout");
@@ -211,10 +201,10 @@ public class Broker extends BlockingComponent {
                 }
                 this.mq.get(t).removeAll(tCleaned);
                 cleaned.addAll(tCleaned);
+                this.mq.get(t).removeAll(aCleaned);
             }
 
             // Return all cleaned messages to the coordinator, so it can answer
-            this.unlock("mq");
             return cleaned;
         } catch (Exception ex) {
             this.logger.info("Could notify subscribers due to exception: " + ex.getMessage());
@@ -225,71 +215,9 @@ public class Broker extends BlockingComponent {
                 sb.append("\t");
             }
             this.logger.debug(sb.toString());
-            this.unlock("mq");
             return null;
-        }
-    }
-
-
-    /**
-     * Checks all subscribers for answers they compiled since last check. Adds those answers to
-     * the internal answers list of the broker
-     */
-    public boolean collectAnswersFromSubs() {
-        // Try to lock the answers queue
-        if (!this.tryToAcquireLock("answer")) return false;
-        try {
-            // Iterate through all subscribers
-            for (ISubscriber sub : this.subscribers) {
-                ArrayList<MessageInfo> sCollected = new ArrayList<>();
-
-                // Iterate through all answers the subscriber has stored
-                for (MessageInfo mi : sub.getAnswers()) {
-                    // If the topic currently doesn't exist in the answers queue, add it
-                    if (this.answers.get(sub.getTopic()) == null) {
-                        this.logger.debug("Topic " + sub.getTopic() + " currently does not exist in answers, adding it");
-                        this.answers.put(sub.getTopic(), new ArrayList<>());
-                    }
-
-                    // Add answer to the answers queue
-                    this.answers.get(sub.getTopic()).add(mi);
-                    sCollected.add(mi);
-                }
-                // Remove answer from subscriber
-                for (MessageInfo mi : sCollected) {
-                    sub.removeAnswer(mi);
-                }
-            }
-
-            // Set all messages that have been answered as answered
-            if (this.tryToAcquireLock("mq")) {
-                for (TopicC top : this.answers.keySet()) {
-                    ArrayList<MessageInfo> toRemove = new ArrayList<>();
-                    for (MessageInfo mi : this.answers.get(top)) {
-                        for (MessageInfo info : this.mq.get(top)) {
-                            if (info.getUuid().equals(mi.getUuid())) {
-                                toRemove.add(info);
-                            }
-                        }
-                    }
-                    this.mq.get(top).removeAll(toRemove);
-                }
-            }
-            // Unlock the queues
+        } finally {
             this.unlock("mq");
-            this.unlock("answer");
-            return true;
-        } catch (Exception ex) {
-            this.logger.info("Could notify subscribers due to exception: " + ex.getMessage());
-            StringBuilder sb = new StringBuilder();
-            for (var stel : ex.getStackTrace()) {
-                sb.append(stel.toString());
-                sb.append("\n");
-                sb.append("\t");
-            }
-            this.logger.debug(sb.toString());
-            this.unlock("answer");
-            return false;
         }
     }
 
@@ -327,22 +255,6 @@ public class Broker extends BlockingComponent {
             }
         }
         this.setState(StateC.DESTROYED);
-    }
-
-    /**
-     * Returns all answers and tries to delete them from the queue
-     * @return Answers from subscribers
-     */
-    public HashMap<TopicC, ArrayList<MessageInfo>> getAndDeleteAnswers() {
-        HashMap<TopicC, ArrayList<MessageInfo>> answers = this.answers;
-        if (this.tryToAcquireLock("answer")) {
-            this.answers.clear();
-        }
-        for (var key : this.answers.keySet()) {
-            this.answers.get(key).trimToSize();
-        }
-        this.unlock("answer");
-        return answers;
     }
 
     /**
