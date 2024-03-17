@@ -8,7 +8,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.DriverManager;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Properties;
@@ -98,10 +97,6 @@ class DBConnection {
             throw new IllegalStateException("Not connected to database");
         }
         this.dbConnection.close();
-    }
-
-    public ResultSet executeQuery(DBQuery query) throws IllegalArgumentException {
-        if (query == null) throw new IllegalArgumentException("No query given");
     }
 
 

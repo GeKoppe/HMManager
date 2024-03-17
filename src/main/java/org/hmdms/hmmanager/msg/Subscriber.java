@@ -1,11 +1,16 @@
 package org.hmdms.hmmanager.msg;
 
+import com.rabbitmq.client.*;
 import org.hmdms.hmmanager.sys.BlockingComponent;
 import org.hmdms.hmmanager.sys.StateC;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.io.Serializable;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Base Class for all message subscribers
@@ -27,17 +32,22 @@ public abstract class Subscriber extends BlockingComponent implements ISubscribe
      * Topic the Subscriber subscribes to
      */
     protected TopicC topic;
+    /**
+     * Factory for creating connections to the rabbitmq service
+     */
+    private final ConnectionFactory connectionFactory;
 
     /**
      * Default constructor
      * @param lockIds Ids for locks the {@link BlockingComponent} should instantiate
      */
-    public Subscriber(String[] lockIds) {
+    public Subscriber(String[] lockIds, ConnectionFactory conn) {
         super(lockIds);
         this.logger = LoggerFactory.getLogger(this.getClass());
         this.currentMessages = new ArrayList<>();
         this.answers = new ArrayList<>();
         this.state = StateC.INITIALIZED;
+        this.connectionFactory = conn;
     }
 
     /**
@@ -55,5 +65,25 @@ public abstract class Subscriber extends BlockingComponent implements ISubscribe
      */
     public void setTopic(TopicC topic) {
         this.topic = topic;
+    }
+
+    protected void answerRequest(BasicProperties props, Serializable answerObj) {
+        try (Connection conn = this.connectionFactory.newConnection(); Channel channel = conn.createChannel()) {
+            AMQP.BasicProperties replyProps = new AMQP.BasicProperties
+                    .Builder()
+                    .correlationId(props.getCorrelationId())
+                    .build();
+
+            channel.basicPublish(
+                    "",
+                    props.getReplyTo(),
+                    replyProps,
+                    answerObj.toString().getBytes(StandardCharsets.UTF_8)
+            );
+        } catch (Exception ex) {
+
+        } finally {
+
+        }
     }
 }

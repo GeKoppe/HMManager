@@ -1,8 +1,10 @@
 package org.hmdms.hmmanager.msg;
 
+import com.rabbitmq.client.BasicProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Serializable;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.UUID;
@@ -10,7 +12,7 @@ import java.util.UUID;
 /**
  * Class that represents a message in the system
  */
-public class MessageInfo {
+public class MessageInfo implements Serializable {
 
     /**
      * Logger
@@ -40,6 +42,11 @@ public class MessageInfo {
      * Date when the message was collected
      */
     private Date collectionDate;
+    /**
+     * Properties of the rabbitmq message.
+     * In order to be able to reply to the rpc message, {@link BasicProperties#getReplyTo()} must not be empty
+     */
+    private BasicProperties messageProps;
 
     /**
      * Default Constructor
@@ -180,5 +187,21 @@ public class MessageInfo {
      */
     public void setCollectionDate(Date collectionDate) {
         this.collectionDate = collectionDate;
+    }
+
+    /**
+     * Returns rpc message properties object
+     * @return rpc message properties object
+     */
+    public BasicProperties getMessageProps() {
+        return messageProps;
+    }
+
+    /**
+     * Sets rpc message properties object
+     * @param messageProps rpc message properties object
+     */
+    public void setMessageProps(BasicProperties messageProps) {
+        this.messageProps = messageProps;
     }
 }

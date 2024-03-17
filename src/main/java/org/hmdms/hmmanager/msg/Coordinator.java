@@ -1,14 +1,20 @@
 package org.hmdms.hmmanager.msg;
 
+import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.Connection;
+import com.rabbitmq.client.ConnectionFactory;
+import com.rabbitmq.client.DeliverCallback;
 import org.hmdms.hmmanager.sys.HealthC;
 import org.hmdms.hmmanager.sys.StateC;
 import org.hmdms.hmmanager.sys.BlockingComponent;
+import org.hmdms.hmmanager.utils.LoggingUtils;
 
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Properties;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Entry point for messages into the system. Receives messages from other components, distributes them among
@@ -44,12 +50,14 @@ public class Coordinator extends BlockingComponent implements Runnable {
      * Counter for number of messages, that could not be delivered to the brokers due to some problem.
      */
     private int droppedMessages = 0;
+    private final String queueName;
+    private final String mqHost;
 
     /**
      * Standard constructor for Coordinator. Looks up number of brokers to instantiate from config.properties file and instantiates them.
      * @throws IOException When config.properties file is not found
      */
-    public Coordinator() throws IOException {
+    public Coordinator() throws IOException, TimeoutException {
         super(new String[]{"brokers"});
         Properties prop = new Properties();
         String propFileName = "config.properties";
@@ -60,17 +68,29 @@ public class Coordinator extends BlockingComponent implements Runnable {
         this.numOfBrokers = Integer.parseInt(prop.getProperty("msg.scaling.brokers"));
         this.messageTimeout = Integer.parseInt(prop.getProperty("msg.timeout"));
         this.brokerAutoScaling = Boolean.parseBoolean(prop.getProperty("msg.scaling.brokers.autoScaling"));
+        this.queueName = prop.get("mq.coordinator.name").toString();
+        this.mqHost = prop.get("mq.host").toString();
 
         this.brokers = new ArrayList<>();
         for (int i = 0; i < this.numOfBrokers; i++) {
             this.brokers.add(new Broker());
         }
         logger.debug("Working with " + this.numOfBrokers + " brokers");
-        this.state = StateC.INITIALIZED;
 
         this.nextBroker = 0;
+        this.state = StateC.INITIALIZED;
     }
 
+    private void newMessage(byte[] message) {
+        ByteArrayInputStream bi = new ByteArrayInputStream(message);
+        try (ObjectInputStream oi = new ObjectInputStream(bi) ) {
+            MessageInfo mi = (MessageInfo) oi.readObject();
+            oi.close();
+            this.newMessage(TopicC.TEST, mi);
+        } catch (Exception ex) {
+            LoggingUtils.logException(ex, this.logger, "info", "Message could not be deserialized due to an %s: %s");
+        }
+    }
     /**
      * Adds a new message to the next broker in line
      * @param topic Topic to which the message should be added
@@ -137,13 +157,32 @@ public class Coordinator extends BlockingComponent implements Runnable {
             return;
         }
         this.state = StateC.WORKING;
+        this.logger.debug("Setting up message queue consumer");
+        ConnectionFactory factory = new ConnectionFactory();
+        factory.setHost(this.mqHost);
+
+        try (Connection conn = factory.newConnection(); Channel channel = conn.createChannel()) {
+            channel.queueDeclare(this.queueName, false, false, false, null);
+            DeliverCallback deliverCallback = (consumerTag, delivery) -> {
+                byte[] message = delivery.getBody();
+                this.newMessage(message);
+            };
+            channel.basicConsume(this.queueName, true, deliverCallback, consumerTag -> { });
+        } catch (Exception ex) {
+            LoggingUtils.logException(
+                    ex,
+                    this.logger,
+                    "warn",
+                    "%s occurred  while trying to setup the message queue: %s"
+            );
+            return;
+        }
 
         // Loop while the state of the component is still at WORKING
         while (this.state.equals(StateC.WORKING)) {
             try {
                 // Iterate through all brokers
                 for (Broker b : this.brokers) {
-
                     // Notify all subscribers of the current broker of new messages
                     b.notifyAllSubscribers();
                     b.collectAnswersFromSubs();
