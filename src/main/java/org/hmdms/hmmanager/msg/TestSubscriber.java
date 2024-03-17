@@ -47,7 +47,6 @@ public class TestSubscriber extends Subscriber {
                     this.answerRequest(m.getMessageProps(), answer);
                     toDelete.add(m);
                     this.unlock("cm");
-                    this.logger.debug("Added answer");
                 }
                 this.currentMessages.removeAll(toDelete);
             } catch (Exception ex) {

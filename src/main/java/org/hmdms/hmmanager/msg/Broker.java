@@ -48,9 +48,24 @@ public class Broker extends BlockingComponent {
      * @param mi Message to be added
      */
     public boolean addMessage(TopicC topic, MessageInfo mi) {
-        if (!this.tryToAcquireLock("mq")) return false;
+        if (topic == null || mi == null) throw new IllegalArgumentException("No topic or message given");
         try {
-            if (topic == null) throw new IllegalArgumentException("No topic given");
+            if (this.notifySingle(topic, mi)) {
+                this.logger.debug("Notified subscriber");
+                return true;
+            }
+        } catch (Exception ex) {
+            this.logger.info("Could not add message due to exception: " + ex.getMessage() + ". Adding it to queue instead");
+            StringBuilder sb = new StringBuilder();
+            for (var stel : ex.getStackTrace()) {
+                sb.append(stel.toString());
+                sb.append("\n");
+                sb.append("\t");
+            }
+            this.logger.debug(sb.toString());
+        }
+        try {
+            if (!this.tryToAcquireLock("mq")) return false;
             this.logger.debug("Adding message " + mi + " to message queue");
 
             // If the topic currently does not exist in the hashmap, add it
@@ -62,7 +77,6 @@ public class Broker extends BlockingComponent {
             // Add message to the list in the message queue
             this.mq.get(topic).add(mi);
             this.logger.debug("MessageInfo object " + mi + " added to queue for topic " + topic);
-            this.unlock("mq");
             return true;
         } catch (Exception ex) {
             this.logger.info("Could not add message due to exception: " + ex.getMessage());
@@ -73,9 +87,41 @@ public class Broker extends BlockingComponent {
                 sb.append("\t");
             }
             this.logger.debug(sb.toString());
-            this.unlock("mq");
             return false;
+        } finally {
+            this.unlock("mq");
         }
+    }
+
+    private boolean notifySingle(TopicC topic, MessageInfo mi) {
+        if (topic == null || mi == null) throw new IllegalArgumentException("No topic or message given");
+        if (!this.tryToAcquireLock("sub")) return false;
+
+        boolean transferred = false;
+        for (ISubscriber sub : this.subscribers) {
+            if (sub.getTopic().equals(topic)) {
+                try {
+                    ArrayList<MessageInfo> mis = new ArrayList<>();
+                    mis.add(mi);
+                    // Get all collected messages and give them to the subscriber
+                    transferred = sub.notify(mis);
+                    if (transferred) {
+                        this.logger.debug("Notified subscriber of new message");
+                        break;
+                    }
+                } catch (Exception ex) {
+                    this.logger.debug("Exception occurred while giving subscribers messages: " + ex.getMessage());
+                    StringBuilder stack = new StringBuilder();
+                    for (var stel : ex.getStackTrace()) {
+                        stack.append(stel.toString());
+                        stack.append("\t\n");
+                    }
+                    this.logger.debug(stack.toString());
+                }
+            }
+        }
+        this.unlock("sub");
+        return transferred;
     }
 
     /**
