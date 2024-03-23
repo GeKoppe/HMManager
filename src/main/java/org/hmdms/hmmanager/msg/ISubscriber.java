@@ -21,5 +21,9 @@ public interface ISubscriber extends Runnable {
      */
     TopicC getTopic();
 
+    /**
+     * Sets state of the subscriber
+     * @param state State of the subscriber
+     */
     void setState(StateC state);
 }

@@ -6,12 +6,16 @@ import com.rabbitmq.client.*;
 import org.hmdms.hmmanager.sys.HealthC;
 import org.hmdms.hmmanager.sys.StateC;
 import org.hmdms.hmmanager.sys.BlockingComponent;
+import org.hmdms.hmmanager.utils.ClassFinder;
 import org.hmdms.hmmanager.utils.LoggingUtils;
 
 import java.io.*;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Properties;
+import java.util.Set;
 
 /**
  * Entry point for messages into the system. Receives messages from other components, distributes them among
@@ -80,9 +84,6 @@ public class Coordinator extends BlockingComponent implements Runnable {
         this.mqHost = prop.get("mq.host").toString();
 
         this.brokers = new ArrayList<>();
-        for (int i = 0; i < this.numOfBrokers; i++) {
-            this.brokers.add(new Broker());
-        }
         logger.debug("Working with " + this.numOfBrokers + " brokers");
 
         this.factory.setHost(this.mqHost);
@@ -267,7 +268,7 @@ public class Coordinator extends BlockingComponent implements Runnable {
     /**
      * Instantiates all brokers this coordinator coordinates
      */
-    public void setup() {
+    public void setup(){
         this.logger.debug("Setting up coordinator");
         this.logger.debug("Adding brokers");
         this.tryToAcquireLock("brokers");
@@ -278,8 +279,31 @@ public class Coordinator extends BlockingComponent implements Runnable {
         }
         this.unlock("brokers");
 
+        Set<Class<? extends Subscriber>> subClasses = ClassFinder.findMessageSubscribers();
+        ArrayList<Constructor<?>> subPrototypes = new ArrayList<>();
+
+        for (var clazz : subClasses) {
+            var constructors = clazz.getConstructors();
+            for (Constructor<?> constr : constructors) {
+                var params = constr.getParameterTypes();
+                if (params.length == 1) {
+                    subPrototypes.add(constr);
+                }
+            }
+        }
         for (Broker br : this.brokers) {
-            br.addSubscriber(new TestSubscriber(this.factory));
+            for (Constructor<?> constr : subPrototypes) {
+                try {
+                    br.addSubscriber((Subscriber) constr.newInstance(this.factory));
+                } catch (Exception ex) {
+                    LoggingUtils.logException(
+                            ex,
+                            this.logger,
+                            "warn",
+                            "%s occurred while trying to instantiate subscriber prototypes: %s"
+                    );
+                }
+            }
         }
 
         this.state = StateC.STARTED;
@@ -300,7 +324,6 @@ public class Coordinator extends BlockingComponent implements Runnable {
         this.brokers.removeAll(toDelete);
         for (int i = 0; i < toDelete.size(); i++) {
             Broker newB = new Broker();
-            newB.addSubscriber(new TestSubscriber(this.factory));
             this.brokers.add(newB);
         }
         this.unlock("brokers");
