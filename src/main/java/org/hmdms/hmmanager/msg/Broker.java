@@ -4,8 +4,7 @@ import org.hmdms.hmmanager.sys.HealthC;
 import org.hmdms.hmmanager.sys.PerformanceCheck;
 import org.hmdms.hmmanager.sys.StateC;
 import org.hmdms.hmmanager.sys.BlockingComponent;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.hmdms.hmmanager.utils.LoggingUtils;
 
 import java.util.*;
 
@@ -21,7 +20,7 @@ public class Broker extends BlockingComponent {
     /**
      * All subscribers that subscribe to this broker
      */
-    private final ArrayList<ISubscriber> subscribers;
+    private final HashMap<TopicC, ArrayList<ISubscriber>> subscribers;
 
     /**
      * Threads of all subscribers to this broker
@@ -36,7 +35,7 @@ public class Broker extends BlockingComponent {
     public Broker () throws IllegalArgumentException {
         super(new String[]{"mq", "sub", "thread"});
         this.mq = new HashMap<>();
-        this.subscribers = new ArrayList<>();
+        this.subscribers = new HashMap<>();
         this.setState(StateC.STARTED);
         this.subThreads = new LinkedList<>();
         this.logger.debug("Broker instantiated");
@@ -48,22 +47,25 @@ public class Broker extends BlockingComponent {
      * @param mi Message to be added
      */
     public boolean addMessage(TopicC topic, MessageInfo mi) {
+        // Check if topic and Message Info have been given
         if (topic == null || mi == null) throw new IllegalArgumentException("No topic or message given");
+
+        // Try to notify a single subscriber. If that does not work, it can still be put into the mq.
         try {
             if (this.notifySingle(topic, mi)) {
                 this.logger.debug("Notified subscriber");
                 return true;
             }
         } catch (Exception ex) {
-            this.logger.info("Could not add message due to exception: " + ex.getMessage() + ". Adding it to queue instead");
-            StringBuilder sb = new StringBuilder();
-            for (var stel : ex.getStackTrace()) {
-                sb.append(stel.toString());
-                sb.append("\n");
-                sb.append("\t");
-            }
-            this.logger.debug(sb.toString());
+            LoggingUtils.logException(
+                    ex,
+                    this.logger,
+                    "warn",
+                    "%s occurred when trying to notify a single subscriber: %s\n\tAdding message to mq instead"
+            );
         }
+
+        // Notifying a single subscriber did not work, add message to message queue
         try {
             if (!this.tryToAcquireLock("mq")) return false;
             this.logger.debug("Adding message " + mi + " to message queue");
@@ -79,45 +81,54 @@ public class Broker extends BlockingComponent {
             this.logger.debug("MessageInfo object " + mi + " added to queue for topic " + topic);
             return true;
         } catch (Exception ex) {
-            this.logger.info("Could not add message due to exception: " + ex.getMessage());
-            StringBuilder sb = new StringBuilder();
-            for (var stel : ex.getStackTrace()) {
-                sb.append(stel.toString());
-                sb.append("\n");
-                sb.append("\t");
-            }
-            this.logger.debug(sb.toString());
+            LoggingUtils.logException(
+                    ex,
+                    this.logger,
+                    "warn",
+                    "%s occurred when trying to add message to message queue: %s"
+            );
             return false;
         } finally {
             this.unlock("mq");
         }
     }
 
+    /**
+     * Is called by {@link Broker#addMessage(TopicC, MessageInfo)}. Immediately notifies a subscriber that
+     * subscribes to the topic {@param topic} of the new message to reduce latency.
+     * @param topic Topic of the message
+     * @param mi Message to notify the subscriber of
+     * @return True, if the message could be given to subscriber, false otherwise
+     */
     private boolean notifySingle(TopicC topic, MessageInfo mi) {
         if (topic == null || mi == null) throw new IllegalArgumentException("No topic or message given");
         if (!this.tryToAcquireLock("sub")) return false;
 
+        if (this.subscribers.get(topic) == null || this.subscribers.get(topic).isEmpty()) {
+            this.logger.warn("No subscriber for topic " + topic + " exists");
+            this.unlock("sub");
+            throw new IllegalArgumentException("No subscribers for topic");
+        }
+
         boolean transferred = false;
-        for (ISubscriber sub : this.subscribers) {
-            if (sub.getTopic().equals(topic)) {
-                try {
-                    ArrayList<MessageInfo> mis = new ArrayList<>();
-                    mis.add(mi);
-                    // Get all collected messages and give them to the subscriber
-                    transferred = sub.notify(mis);
-                    if (transferred) {
-                        this.logger.debug("Notified subscriber of new message");
-                        break;
-                    }
-                } catch (Exception ex) {
-                    this.logger.debug("Exception occurred while giving subscribers messages: " + ex.getMessage());
-                    StringBuilder stack = new StringBuilder();
-                    for (var stel : ex.getStackTrace()) {
-                        stack.append(stel.toString());
-                        stack.append("\t\n");
-                    }
-                    this.logger.debug(stack.toString());
+        // Iterate through all subscribers
+        for (ISubscriber sub : this.subscribers.get(topic)) {
+            try {
+                ArrayList<MessageInfo> mis = new ArrayList<>();
+                mis.add(mi);
+                // Get all collected messages and give them to the subscriber
+                transferred = sub.notify(mis);
+                if (transferred) {
+                    this.logger.debug("Notified subscriber of new message");
+                    break;
                 }
+            } catch (Exception ex) {
+                LoggingUtils.logException(
+                        ex,
+                        this.logger,
+                        "info",
+                        "%s occurred while notifying subscribers of new Message: \"%s\". Message will be put into message queue instead."
+                );
             }
         }
         this.unlock("sub");
@@ -129,6 +140,10 @@ public class Broker extends BlockingComponent {
      */
     public boolean notifyAllSubscribers() {
         if (!this.tryToAcquireLock("mq")) return false;
+        if (!this.tryToAcquireLock("sub")) {
+            this.unlock("mq");
+            return false;
+        }
         try {
             Set<TopicC> keySet = this.mq.keySet();
             for (TopicC topic : keySet) {
@@ -138,28 +153,32 @@ public class Broker extends BlockingComponent {
                 if (this.mq.get(topic) == null || this.mq.get(topic).isEmpty()) {
                     continue;
                 }
-                for (ISubscriber sub : this.subscribers) {
+                if (this.subscribers.get(topic) == null || this.subscribers.get(topic).isEmpty()) {
+                    this.logger.warn("No subscriber for topic " + topic + " exists");
+                    // TODO request new sub for topic
+                    continue;
+                }
+                for (ISubscriber sub : this.subscribers.get(topic)) {
                     // If subscriber subscribes to given topic, give them messages concerning the topic
-                    if (sub.getTopic().equals(topic)) {
-                        try {
-                            // Get all collected messages and give them to the subscriber
-                            LinkedList<MessageInfo> uncollected = this.mq.get(topic);
-                            for (MessageInfo next : uncollected) {
-                                if (!next.isCollected()) mis.add(next);
-                            }
-                            transferred = sub.notify(mis);
-                            this.logger.trace("Notified subscribers of new message");
-                        } catch (Exception ex) {
-                            this.logger.debug("Exception occurred while giving subscribers messages: " + ex.getMessage());
-                            StringBuilder stack = new StringBuilder();
-                            for (var stel : ex.getStackTrace()) {
-                                stack.append(stel.toString());
-                                stack.append("\t\n");
-                            }
-                            this.logger.debug(stack.toString());
+                    try {
+                        // Get all collected messages and give them to the subscriber
+                        LinkedList<MessageInfo> uncollected = this.mq.get(topic);
+                        for (MessageInfo next : uncollected) {
+                            if (!next.isCollected()) mis.add(next);
                         }
+                        transferred = sub.notify(mis);
+                        this.logger.trace("Notified subscribers of new message");
+                    } catch (Exception ex) {
+                        this.logger.debug("Exception occurred while giving subscribers messages: " + ex.getMessage());
+                        StringBuilder stack = new StringBuilder();
+                        for (var stel : ex.getStackTrace()) {
+                            stack.append(stel.toString());
+                            stack.append("\t\n");
+                        }
+                        this.logger.debug(stack.toString());
                     }
                 }
+
 
                 // Mark all transferred messages as collected
                 if (transferred) {
@@ -175,17 +194,11 @@ public class Broker extends BlockingComponent {
             }
             return true;
         } catch (Exception ex) {
-            this.logger.info("Could notify subscribers due to exception: " + ex.getMessage());
-            StringBuilder sb = new StringBuilder();
-            for (var stel : ex.getStackTrace()) {
-                sb.append(stel.toString());
-                sb.append("\n");
-                sb.append("\t");
-            }
-            this.logger.debug(sb.toString());
+            LoggingUtils.logException(ex, this.logger, "info", "%s occurred while notifying subscribers: %s");
             return false;
         } finally {
             this.unlock("mq");
+            this.unlock("sub");
         }
 
     }
@@ -199,7 +212,8 @@ public class Broker extends BlockingComponent {
             this.unlock("sub");
             return false;
         }
-        this.subscribers.add(s);
+        this.subscribers.computeIfAbsent(s.getTopic(), k -> new ArrayList<ISubscriber>());
+        this.subscribers.get(s.getTopic()).add(s);
         this.logger.debug("Added subscriber " + s.toString());
 
         if (!this.tryToAcquireLock("thread")) {
@@ -273,8 +287,10 @@ public class Broker extends BlockingComponent {
      */
     public void destroy() {
         // Set stopped state on all subscribers so their thread comes to a stop
-        for (ISubscriber sub : this.subscribers) {
-            sub.setState(StateC.STOPPED);
+        for (var top : this.subscribers.keySet()) {
+            for (ISubscriber sub : this.subscribers.get(top)) {
+                sub.setState(StateC.STOPPED);
+            }
         }
 
         // Wait for all threads to finish. If
@@ -288,14 +304,7 @@ public class Broker extends BlockingComponent {
                     t.interrupt();
                 }
             } catch (InterruptedException ex) {
-                this.logger.debug("Thread " + t + " was interrupted unexpectedly while trying to join it: " + ex.getMessage());
-                StringBuilder sb = new StringBuilder();
-                for (var stel : ex.getStackTrace()) {
-                    sb.append("\n");
-                    sb.append("\t");
-                    sb.append(stel.toString());
-                }
-                this.logger.debug(sb.toString());
+                LoggingUtils.logException(ex, this.logger, "warn", "%s while joining Thread " + t + ": %s");
                 this.logger.debug("Setting interrupt on thread " + t + " to make sure it is dead");
                 t.interrupt();
             }
