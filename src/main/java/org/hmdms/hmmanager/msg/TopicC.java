@@ -9,9 +9,9 @@ public enum TopicC {
      */
     TEST,
     /**
-     * Login Job
+     * All messages concerning logins and authorisation at the system.
      */
-    LOGIN,
+    AUTH,
     /**
      * All messages concerning file upload or download
      */

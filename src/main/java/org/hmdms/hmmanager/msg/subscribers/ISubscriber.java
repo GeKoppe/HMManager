@@ -1,5 +1,7 @@
-package org.hmdms.hmmanager.msg;
+package org.hmdms.hmmanager.msg.subscribers;
 
+import org.hmdms.hmmanager.msg.MessageInfo;
+import org.hmdms.hmmanager.msg.TopicC;
 import org.hmdms.hmmanager.sys.StateC;
 
 import java.util.ArrayList;

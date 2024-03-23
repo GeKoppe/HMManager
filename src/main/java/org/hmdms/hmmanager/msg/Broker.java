@@ -1,5 +1,6 @@
 package org.hmdms.hmmanager.msg;
 
+import org.hmdms.hmmanager.msg.subscribers.ISubscriber;
 import org.hmdms.hmmanager.sys.HealthC;
 import org.hmdms.hmmanager.sys.PerformanceCheck;
 import org.hmdms.hmmanager.sys.StateC;

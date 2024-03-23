@@ -1,7 +1,9 @@
-package org.hmdms.hmmanager.msg;
+package org.hmdms.hmmanager.msg.subscribers;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.*;
+import org.hmdms.hmmanager.msg.MessageInfo;
+import org.hmdms.hmmanager.msg.TopicC;
 import org.hmdms.hmmanager.sys.BlockingComponent;
 import org.hmdms.hmmanager.sys.StateC;
 import org.hmdms.hmmanager.utils.LoggingUtils;

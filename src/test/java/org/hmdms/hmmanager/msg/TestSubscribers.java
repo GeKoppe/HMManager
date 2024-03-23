@@ -1,5 +1,6 @@
 package org.hmdms.hmmanager.msg;
 
+import org.hmdms.hmmanager.msg.subscribers.Subscriber;
 import org.hmdms.hmmanager.utils.ClassFinder;
 import org.junit.Test;
 
