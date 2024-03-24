@@ -58,12 +58,18 @@ public class MessageInfo implements Serializable {
 
     /**
      * Constructor for the MessageInfo object
+     * @param props Properties of the amqp messsage
      */
     public MessageInfo(BasicProperties props) {
         this();
         this.messageProps = props;
     }
 
+    /**
+     * Constructor that sets the class fields {@link MessageInfo#messageProps} and {@link MessageInfo#jsonMessage}
+     * @param props RabbitMQ props of the message
+     * @param jsonMessage Json String of the message
+     */
     public MessageInfo(BasicProperties props, String jsonMessage) {
         this(props);
         this.jsonMessage = jsonMessage;
@@ -165,10 +171,18 @@ public class MessageInfo implements Serializable {
         this.messageProps = messageProps;
     }
 
+    /**
+     * Returns the json message that is to be transmitted by this object
+     * @return json message that is to be transmitted by this object
+     */
     public String getJsonMessage() {
         return jsonMessage;
     }
 
+    /**
+     * Sets the json message that is to be transmitted by this object
+     * @param jsonMessage json message that is to be transmitted by this object
+     */
     public void setJsonMessage(String jsonMessage) {
         this.jsonMessage = jsonMessage;
     }

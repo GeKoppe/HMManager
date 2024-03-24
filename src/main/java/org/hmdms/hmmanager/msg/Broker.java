@@ -46,6 +46,7 @@ public class Broker extends BlockingComponent {
      * Adds message {@param mi} to the queue for the given topic {@param topic}
      * @param topic Topic to which the message should be added
      * @param mi Message to be added
+     * @return True, if message could be added
      */
     public boolean addMessage(TopicC topic, MessageInfo mi) {
         // Check if topic and Message Info have been given
@@ -138,6 +139,7 @@ public class Broker extends BlockingComponent {
 
     /**
      * Method to notify all subscribers of all topics to get any not yet collected messages out
+     * @return True, if subscribers could be notified
      */
     public boolean notifyAllSubscribers() {
         if (!this.tryToAcquireLock("mq")) return false;
@@ -206,6 +208,7 @@ public class Broker extends BlockingComponent {
     /**
      * Adds a subscriber that subscribes to this broker
      * @param s subscriber object
+     * @return True, if subscriber could be added
      */
     public boolean addSubscriber(ISubscriber s) {
         if (!this.tryToAcquireLock("sub")) {

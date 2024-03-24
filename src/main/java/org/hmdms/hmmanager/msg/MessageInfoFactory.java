@@ -16,6 +16,10 @@ public class MessageInfoFactory {
     private final Logger logger = LoggerFactory.getLogger(MessageInfoFactory.class);
 
     /**
+     * Default constructor
+     */
+    public MessageInfoFactory() { }
+    /**
      * Returns a new default MessageInfo Object
      * @return A default MessageInfo object
      */

@@ -22,6 +22,9 @@ public abstract class Component {
      */
     protected final Logger logger;
 
+    /**
+     * All performance indicators
+     */
     protected final HashMap<String, PerformanceCheck> performance;
 
     /**
@@ -66,6 +69,11 @@ public abstract class Component {
         this.health = health;
     }
 
+    /**
+     * NOT YET IMPLEMENTED
+     * @param id Id of the perfomance check
+     * @throws IllegalArgumentException Thrown, when the id is empty or already exists in the performance check
+     */
     public void addPerformanceCheck(String id) throws IllegalArgumentException {
         if (id == null || id.isEmpty()) {
             throw new IllegalArgumentException("No id given");
@@ -78,6 +86,11 @@ public abstract class Component {
         this.performance.put(id, new PerformanceCheck());
     }
 
+    /**
+     * NOT YET IMPLEMENTED
+     * @param id Id of the performance check for which the operation is started
+     * @throws IllegalArgumentException Thrown, when there is no performance check with given {@param id}
+     */
     protected void startOperation(String id) throws IllegalArgumentException {
         if (this.performance.get((id)) == null) {
             throw new IllegalArgumentException(String.format("No performancechecker with id %s exists", id));

@@ -2,12 +2,23 @@ package org.hmdms.hmmanager.db;
 
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Factory class for Database Query objects
  */
 public class DBQueryFactory {
 
+    /**
+     * Logger
+     */
+    private static final Logger logger = LoggerFactory.getLogger(DBQueryFactory.class);
+
+    /**
+     * Default constructor
+     */
+    public DBQueryFactory() { }
     /**
      * Creates an empty {@link DBQuery} object and returns it.
      * @return An empty {@link DBQuery} object

@@ -12,11 +12,19 @@ import java.util.Set;
  */
 public abstract class ClassFinder {
 
-    private static Logger logger = LoggerFactory.getLogger(ClassFinder.class);
+    /**
+     * Logger
+     */
+    private static final Logger logger = LoggerFactory.getLogger(ClassFinder.class);
+
+    /**
+     * Default constructor
+     */
+    public ClassFinder() { }
     /**
      * Scans the package {@link org.hmdms.hmmanager.msg} for all classes, that extend the {@link Subscriber}.
      * Returns class definitions of those classes
-     * @return
+     * @return All subscriber classes
      */
     public static Set<Class<? extends Subscriber>> findMessageSubscribers() {
         logger.debug("Scanning for subscriber classes");

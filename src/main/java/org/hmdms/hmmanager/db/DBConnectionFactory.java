@@ -15,6 +15,11 @@ public abstract class DBConnectionFactory {
      * Logger
      */
     private static final Logger logger = LoggerFactory.getLogger(DBConnectionFactory.class);
+
+    /**
+     * Default constructor
+     */
+    public DBConnectionFactory() { }
     /**
      * Creates a new DB Connection object for connecting to the applications own database.
      * Uses the default constructor {@link DBConnection#DBConnection()}, which reads the database configuration

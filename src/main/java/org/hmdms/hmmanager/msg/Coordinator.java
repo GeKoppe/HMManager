@@ -1,5 +1,6 @@
 package org.hmdms.hmmanager.msg;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.*;
@@ -92,7 +93,16 @@ public class Coordinator extends BlockingComponent implements Runnable {
         this.state = StateC.INITIALIZED;
     }
 
-    private void newMessage(String message, BasicProperties props) {
+    /**
+     * Is called, whenever a new message from the queue should be added to a broker.
+     * Converts {@param message} into a {@link JsonNode} and adds it to the next free broker.
+     * @param message Message the broker should receive
+     * @param props AMQP Message props
+     * @throws IllegalArgumentException When the message has no topic or message property
+     * @throws JsonProcessingException When {@param message} could not be deserialized into a {@link JsonNode}
+     */
+    private void newMessage(String message, BasicProperties props)
+            throws IllegalArgumentException, JsonProcessingException {
         this.logger.debug("Parsing json message into MessageInfo object");
         try {
             JsonNode node = new ObjectMapper().readTree(message);
@@ -174,7 +184,7 @@ public class Coordinator extends BlockingComponent implements Runnable {
     /**
      * Runs main logic of the coordinator. Can and should be run in a different thread.
      * Loops through the entire logic over and over again, until the state of the coordinator is set to
-     * something else than StateC.WORKING
+     * something else than {@link StateC#WORKING}
      */
     @Override
     public void run() {
@@ -310,6 +320,9 @@ public class Coordinator extends BlockingComponent implements Runnable {
         this.logger.debug("Coordinator is fully setup");
     }
 
+    /**
+     * NOT YET IMPLEMENTED FULLY
+     */
     private void checkAndRedeployBrokers() {
         if (!this.tryToAcquireLock("brokers")) return;
         ArrayList<Broker> toDelete = new ArrayList<>();

@@ -11,6 +11,11 @@ public abstract class LoggingUtils {
      * Classes own logger
      */
     private static Logger loggingLogger = LoggerFactory.getLogger(LoggingUtils.class.getName());
+
+    /**
+     * Default Constructor
+     */
+    public LoggingUtils() { }
     /**
      * Callback to {@link LoggingUtils#logException(Exception, Logger, String)} with level info for the message.
      * @param ex Exception that should be logged.

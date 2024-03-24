@@ -38,6 +38,7 @@ public abstract class Subscriber extends BlockingComponent implements ISubscribe
     /**
      * Default constructor
      * @param lockIds Ids for locks the {@link BlockingComponent} should instantiate
+     * @param conn Connectionfactory the subscriber should use to connect to the RabbitMQ for answering requests
      */
     public Subscriber(String[] lockIds, ConnectionFactory conn) {
         super(lockIds);
@@ -64,6 +65,14 @@ public abstract class Subscriber extends BlockingComponent implements ISubscribe
         this.topic = topic;
     }
 
+    /**
+     * Answers the request defined by {@param props}.
+     * Connects to the RabbitMQ Queue the requester opened and set in the replyTo property of {@param props}
+     * object. Serializes the {@param answerObj} and sends it over the opened channel to the queue
+     * @param props Message props of the original request message
+     * @param answerObj Object that the requester should receive
+     * @return True, if answering worked, false otherwise
+     */
     protected boolean answerRequest(BasicProperties props, Serializable answerObj) {
         try (Connection conn = this.connectionFactory.newConnection(); Channel channel = conn.createChannel()) {
             AMQP.BasicProperties replyProps = new AMQP.BasicProperties
