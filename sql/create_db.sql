@@ -12,7 +12,7 @@ GO
 -- Table containing all users
 CREATE TABLE user (
     user_id nvarchar(255) PRIMARY KEY,
-    user_name nvarchar(255) NOT NULL,
+    user_name nvarchar(255) NOT NULL UNIQUE,
     pw nvarchar(255) NOT NULL,
     locked boolean NOT NULL
 );
