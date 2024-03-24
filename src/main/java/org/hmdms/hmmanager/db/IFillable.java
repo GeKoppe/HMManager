@@ -16,4 +16,6 @@ public interface IFillable {
      * @return True, if everything worked, false otherwise
      */
     boolean fillFromResultSet(ResultSet rs);
+
+
 }

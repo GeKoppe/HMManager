@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.Objects;
 import java.util.Properties;
 
 /**
@@ -210,30 +211,72 @@ public class DBConnection {
         this.logger.debug("Disconnected from database");
     }
 
-
-
-
+    /**
+     * Gets jdbc string this object uses for db connection
+     * @return jdbc string this object uses for db connection
+     */
     public String getJdbcString() {
         return jdbcString;
     }
 
+    /**
+     * Sets jdbc string this object uses for db connection
+     * @param jdbcString jdbc string this object uses for db connection
+     */
     public void setJdbcString(String jdbcString) {
         this.jdbcString = jdbcString;
     }
 
+    /**
+     * Gets name of the user for connecting to database
+     * @return name of the user for connecting to database
+     */
     public String getUser() {
         return user;
     }
 
+    /**
+     * Sets name of the user for connecting to database
+     * @param user name of the user for connecting to database
+     */
     public void setUser(String user) {
         this.user = user;
     }
 
+    /**
+     * Gets password used for connecting to database
+     * @return password used for connecting to database
+     */
     public String getPassword() {
         return password;
     }
 
+    /**
+     * Sets password used for connecting to database
+     * @param password password used for connecting to database
+     */
     public void setPassword(String password) {
         this.password = password;
+    }
+
+    /**
+     * {@inheritDoc}
+     * @param o Object to be checked for equality
+     * @return True, if objects are equal
+     */
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof DBConnection that)) return false;
+        return Objects.equals(dbConnection, that.dbConnection) && Objects.equals(getJdbcString(), that.getJdbcString()) && Objects.equals(getUser(), that.getUser()) && Objects.equals(getPassword(), that.getPassword());
+    }
+
+    /**
+     * {@inheritDoc}
+     * @return Hashcode of th object
+     */
+    @Override
+    public int hashCode() {
+        return Objects.hash(dbConnection, getJdbcString(), getUser(), getPassword());
     }
 }
