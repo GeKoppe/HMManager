@@ -1,5 +1,6 @@
 package org.hmdms.hmmanager.sys.cache;
 
+import org.hmdms.hmmanager.sys.StateC;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -22,6 +23,7 @@ public abstract class Cache {
      */
     protected static HashMap<String, ReentrantLock> locks = new HashMap<>();
 
+    protected static StateC state;
     /**
      * Default constructor
      */

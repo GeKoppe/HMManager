@@ -31,4 +31,5 @@ ADD CONSTRAINT FK_tick_user_id FOREIGN KEY (user_id) REFERENCES(users.user_id);
 
 GO
 
-INSERT INTO users
+INSERT INTO users (user_id, user_name, pw, locked)
+VALUES ('123', 'admin', 'elo', 0)

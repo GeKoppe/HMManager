@@ -104,7 +104,7 @@ public class UserSubscriber extends Subscriber {
      * @param reason Reason for the failed login
      */
     private void loginFailedInternal(MessageInfo mi, String reason) {
-
+        this.answerRequest(mi.getMessageProps(), "Something went wrong on our side");
     }
 
     /**
@@ -113,7 +113,8 @@ public class UserSubscriber extends Subscriber {
      * @param reason Reason for the failed login
      */
     private void loginFailed(MessageInfo mi, String reason) {
-
+        // TODO Answer in different format than string
+        this.answerRequest(mi.getMessageProps(), "Something went wrong on your side");
     }
 
     /**
@@ -135,14 +136,14 @@ public class UserSubscriber extends Subscriber {
             return;
         }
 
-        String userName = node.get("username").toString();
-        String pw = node.get("pw").toString();
+        String userName = node.get("username").asText();
+        String pw = node.get("password").asText();
 
         UserTicket ticket;
         try {
             ticket = UserService.login(userName, pw);
         } catch (Exception ex) {
-            // TODO error handling
+            this.loginFailed(mi, "");
             return;
         }
         if (!this.answerRequest(mi.getMessageProps(), ticket)) {

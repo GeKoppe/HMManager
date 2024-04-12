@@ -1,11 +1,13 @@
 package org.hmdms.hmmanager.db;
 
+import org.hmdms.hmmanager.sys.cache.ConfigCache;
 import org.hmdms.hmmanager.utils.LoggingUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.ObjectInputFilter;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.Objects;
@@ -44,22 +46,14 @@ public class DBConnection {
      * Default constructor for DBConnection object.
      * This constructor reads the db_config.properties file from the resources and uses the given information
      * to initialise a database connection.
-     * Other database
-     * @throws IOException When the configuration file or parts of it could not be read
+     * Other database connections can only be instantiated by using getters and setters when this constructor was used.
      */
-    DBConnection() throws IOException {
+    DBConnection() throws IllegalArgumentException {
         this.logger.debug("Instantiating new default db connection");
-        Properties prop = new Properties();
-        String propFileName = "config.properties";
-        InputStream inputStream = getClass().getClassLoader().getResourceAsStream(propFileName);
-        prop.load(inputStream);
-
-        this.logger.info("Read the configuration file");
         try {
-            this.user = prop.get("user").toString();
-            // TODO check if password is hashed and do something with it
-            this.password = prop.get("password").toString();
-            this.jdbcString = prop.get("").toString();
+            this.user = (String) ConfigCache.getDbConfigProperty("username");
+            this.password = (String) ConfigCache.getDbConfigProperty("password");
+            this.jdbcString = (String) ConfigCache.getDbConfigProperty("url");
         } catch (Exception ex) {
             LoggingUtils.logException(
                     ex,
@@ -158,7 +152,7 @@ public class DBConnection {
                 st.execute();
                 rs = st.getGeneratedKeys();
             } else {
-                Statement st = this.dbConnection.createStatement();
+                Statement st = this.dbConnection.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
                 rs = st.executeQuery(query.getQueryString());
             }
         } catch (Exception ex) {

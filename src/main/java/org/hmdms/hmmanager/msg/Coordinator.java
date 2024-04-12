@@ -118,7 +118,7 @@ public class Coordinator extends BlockingComponent implements Runnable {
             TopicC mTopic = TopicC.valueOf(node.get("topic").asText());
 
             MessageInfo mi = MessageInfoFactory.createDefaultMessageInfo();
-            mi.setJsonMessage(node.get("message").asText());
+            mi.setJsonMessage(node.get("message").toString());
             mi.setMessageProps(props);
             this.logger.debug("Created MessageInfo object for executing task");
 

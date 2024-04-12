@@ -1,16 +1,20 @@
 package org.hmdms.hmmanager.sys.services;
 
+import org.hmdms.hmmanager.core.user.User;
 import org.hmdms.hmmanager.core.user.UserTicket;
 import org.hmdms.hmmanager.core.user.UserTicketFactory;
 import org.hmdms.hmmanager.db.*;
-import org.hmdms.hmmanager.sys.cache.AuthCache;
+import org.hmdms.hmmanager.sys.cache.UserCache;
+import org.hmdms.hmmanager.sys.exceptions.auth.UserNotFoundException;
 import org.hmdms.hmmanager.utils.LoggingUtils;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.UUID;
@@ -38,7 +42,7 @@ public abstract class UserService extends Service {
      * @throws SQLException When
      * @throws IOException When shit goes down
      */
-    public static UserTicket login(String userName, String pw) throws SQLException, IOException {
+    public static UserTicket login(String userName, String pw) throws SQLException, IOException, UserNotFoundException {
         UserTicket ticket;
         try {
             if (!userMatchesPw(userName, pw)) {
@@ -46,7 +50,7 @@ public abstract class UserService extends Service {
                 throw new IllegalArgumentException("Username and pw do not match");
             }
             DBConnection conn = DBConnectionFactory.newDefaultConnection();
-            DBQuery query = DBQueryFactory.createSelectQuery(String.format("SELECT user_id FROM user WHERE user_name = '%s'", userName));
+            DBQuery query = DBQueryFactory.createSelectQuery(String.format("SELECT user_id FROM users WHERE user_name = '%s'", userName));
             ResultSet rs = conn.execute(query);
 
             if (rs.last()) {
@@ -59,7 +63,7 @@ public abstract class UserService extends Service {
             } else {
                 logger.debug("No rows where fetched");
                 rs.close();
-                throw new IllegalArgumentException("No user with given username present in db");
+                throw new UserNotFoundException("No user with given username present in db");
             }
 
             rs.first();
@@ -80,19 +84,18 @@ public abstract class UserService extends Service {
      * @param pw Password the user provided
      * @return True, if user and password match
      */
-    public static boolean userMatchesPw(String userName, String pw) {
+    public static boolean userMatchesPw(String userName, String pw) throws UserNotFoundException, SQLException, IOException {
         boolean result = false;
         logger.debug(String.format("Checking %s password against provided pw", userName));
         try {
             // Connect to the database and create a query object
             DBConnection conn = DBConnectionFactory.newDefaultConnection();
-            DBQuery q = DBQueryFactory.createSelectQuery(String.format("SELECT pw FROM user WHERE user_name = '%s'", userName));
+            DBQuery q = DBQueryFactory.createSelectQuery(String.format("SELECT pw FROM users WHERE user_name = '%s'", userName));
 
             // Execute the query
             ResultSet rs = conn.execute(q);
 
             // Check, if there are 0 or more than 1 rows and return false, as something went wrong
-            // TODO maybe better to throw ex here
             if (rs.last()) {
                 if (rs.getRow() != 1) {
                     logger.debug("Found more than 1 row, cannot exactly match");
@@ -102,7 +105,7 @@ public abstract class UserService extends Service {
             } else {
                 logger.debug("No rows were fetched");
                 rs.close();
-                return false;
+                throw new UserNotFoundException(String.format("User with name '%s' does not exist", userName));
             }
 
             // Set cursor to first row and check, whether the value in the pw column matches the supplied pw
@@ -113,8 +116,35 @@ public abstract class UserService extends Service {
             else logger.debug("Given username and pw don't match");
         } catch (Exception ex) {
             LoggingUtils.logException(ex, logger, "info");
+            throw ex;
         }
         return result;
+    }
+
+    public static User addUser(String userName, String pw) throws IllegalArgumentException {
+        if (userName == null || userName.isEmpty()) {
+            logger.debug("No username given");
+            throw new IllegalArgumentException("No username given");
+        }
+
+        if (pw == null || pw.isEmpty()) {
+            logger.debug("No password given");
+            throw new IllegalArgumentException("No password given");
+        }
+
+
+    }
+
+    private static boolean userExists(String userName) throws IllegalArgumentException {
+        if (userName == null || userName.isEmpty()) {
+            logger.debug("No username given");
+            throw new IllegalArgumentException("No username given");
+        }
+
+    }
+
+    private static boolean userExists(@NotNull User user) throws IllegalArgumentException {
+        return userExists(user.getUserName());
     }
 
     /**
@@ -129,23 +159,36 @@ public abstract class UserService extends Service {
             throw new IllegalArgumentException("No userid given");
         }
         logger.debug(String.format("Creating ticket for userId %s", userId));
+        Date nowDate;
+        Date expiryDate;
+        String ticketId = generateTicket();
         try {
+            nowDate = new Date();
+            expiryDate = new Date();
+            expiryDate.setTime(nowDate.getTime() + 100000);
             DBConnection conn = DBConnectionFactory.newDefaultConnection();
+            // TODO generalise simepledateformat
             DBQuery query = DBQueryFactory.createInsertQuery(
                     String.format(
-                            "INSERT INTO ticket (ticket, user_id, issued_at,valid_thru) VALUES "
-                            + "('%s', '%s', '%x', '%x');",
+                            "INSERT INTO tickets (ticket, user_id, issued_at,valid_thru) VALUES "
+                            + "('%s', '%s', '%s', '%s');",
+                            ticketId,
                             userId,
-                            generateTicket(),
-                            new Date().getTime(),
-                            new Date().getTime() + 100000
+                            new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(nowDate),
+                            new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(expiryDate)
                     )
             );
             conn.execute(query);
         } catch (Exception ex) {
-
+            return null;
         }
-        return new UserTicket();
+        UserTicket ticket = UserTicketFactory.createDefaultTicket();
+        ticket.setUserId(userId);
+        ticket.setTicket(ticketId);
+        ticket.setIssuedAt(nowDate);
+        ticket.setValidThru(expiryDate);
+
+        return ticket;
     }
 
     /**
@@ -158,14 +201,14 @@ public abstract class UserService extends Service {
 
     /**
      * Checks, whether ticket {@param ticket} is still valid.
-     * Calls {@link AuthCache#getTicket(String)} with {@param ticket} and checks, whether the current
+     * Calls {@link UserCache#getTicket(String)} with {@param ticket} and checks, whether the current
      * date is after the that tickets valid_thru date.
      * @param ticket Id of the ticket to be checked
      * @return True, if ticket is still valid
      */
     public static boolean ticketValid(String ticket) {
         boolean valid = false;
-        UserTicket t = AuthCache.getTicket(ticket);
+        UserTicket t = UserCache.getTicket(ticket);
         if (t.getValidThru().compareTo(new Date()) > 0) valid = true;
         return valid;
     }
@@ -180,14 +223,14 @@ public abstract class UserService extends Service {
         try {
             DBConnection conn = DBConnectionFactory.newDefaultConnection();
             DBQuery q = DBQueryFactory.createSelectQuery(
-                    "SELECT ticket, user_id, issued_at, valid_thru FROM ticket"
+                    "SELECT ticket, user_id, issued_at, valid_thru FROM tickets"
             );
             ResultSet rs = conn.execute(q);
             ArrayList<UserTicket> tickets = UserTicketFactory.createFromResultset(rs);
             rs.close();
-            AuthCache.invalidateTickets();
+            UserCache.invalidateTickets();
             for (UserTicket t : tickets) {
-                AuthCache.addTicket(t);
+                UserCache.addTicket(t);
             }
         } catch (Exception ex) {
             LoggingUtils.logException(
