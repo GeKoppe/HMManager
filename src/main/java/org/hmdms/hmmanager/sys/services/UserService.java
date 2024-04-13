@@ -121,6 +121,13 @@ public abstract class UserService extends Service {
         return result;
     }
 
+    /**
+     * Creates a new user in the system
+     * @param userName Name of the user
+     * @param pw Password of the user
+     * @return User object of the created user
+     * @throws IllegalArgumentException When either username or pw are not given
+     */
     public static User addUser(String userName, String pw) throws IllegalArgumentException {
         if (userName == null || userName.isEmpty()) {
             logger.debug("No username given");
@@ -132,17 +139,30 @@ public abstract class UserService extends Service {
             throw new IllegalArgumentException("No password given");
         }
 
-
+        return new User();
     }
 
+    /**
+     * Checks, if user exists in the system. Calls {@link UserCache#userExists(String)}.
+     * @param userName Username to be checked for existence
+     * @return True, if the user exists, false otherwise
+     * @throws IllegalArgumentException Thrown when no username is given
+     */
     private static boolean userExists(String userName) throws IllegalArgumentException {
         if (userName == null || userName.isEmpty()) {
             logger.debug("No username given");
             throw new IllegalArgumentException("No username given");
         }
 
+        return UserCache.userExists(userName);
     }
 
+    /**
+     * Callback to {@link UserService#userExists(String)} with name property of {@param user}.
+     * @param user User object that should be checked for existence
+     * @return True, if the user exists, false otherwise
+     * @throws IllegalArgumentException If username is either null or empty
+     */
     private static boolean userExists(@NotNull User user) throws IllegalArgumentException {
         return userExists(user.getUserName());
     }
@@ -213,7 +233,6 @@ public abstract class UserService extends Service {
         return valid;
     }
 
-    // TODO implement fully
     /**
      * Refreshes the ticket cache
      * @throws Exception Any exception thrown during the instantiation of new tickets
@@ -226,7 +245,7 @@ public abstract class UserService extends Service {
                     "SELECT ticket, user_id, issued_at, valid_thru FROM tickets"
             );
             ResultSet rs = conn.execute(q);
-            ArrayList<UserTicket> tickets = UserTicketFactory.createFromResultset(rs);
+            ArrayList<UserTicket> tickets = UserTicketFactory.createFromResultSet(rs);
             rs.close();
             UserCache.invalidateTickets();
             for (UserTicket t : tickets) {

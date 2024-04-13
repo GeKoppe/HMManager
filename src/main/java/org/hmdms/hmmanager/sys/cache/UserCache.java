@@ -1,11 +1,22 @@
 package org.hmdms.hmmanager.sys.cache;
 
 import org.hmdms.hmmanager.core.user.User;
+import org.hmdms.hmmanager.core.user.UserFactory;
 import org.hmdms.hmmanager.core.user.UserTicket;
+import org.hmdms.hmmanager.core.user.UserTicketFactory;
+import org.hmdms.hmmanager.db.DBConnection;
+import org.hmdms.hmmanager.db.DBConnectionFactory;
+import org.hmdms.hmmanager.db.DBQuery;
+import org.hmdms.hmmanager.db.DBQueryFactory;
+import org.hmdms.hmmanager.sys.exceptions.system.CachingException;
+import org.hmdms.hmmanager.utils.LoggingUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.sql.ResultSet;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Cache for all authorisation related information
@@ -15,7 +26,7 @@ public abstract class UserCache extends Cache {
     /**
      * Logger
      */
-    private static Logger logger = LoggerFactory.getLogger(UserCache.class);
+    private static final Logger logger = LoggerFactory.getLogger(UserCache.class);
     /**
      * True, if {@link UserCache#tickets} should be invalidated and refreshed.
      */
@@ -73,9 +84,15 @@ public abstract class UserCache extends Cache {
      * @return True, if invalidation worked
      */
     public static boolean invalidateTickets() {
-        for (String key : tickets.keySet()) {
-            // Implement
+        if (!tryToAcquireLock("tickets")) {
+            logger.info("Could not acquire lock on tickets");
+            return false;
         }
+        ArrayList<UserTicket> toRemove = new ArrayList<>();
+        for (String key : tickets.keySet()) {
+            // TODO check if ticket is still valid
+        }
+        unlock("tickets");
         return true;
     }
 
@@ -103,7 +120,79 @@ public abstract class UserCache extends Cache {
         return result;
     }
 
-    public static void initCache() {
+    public static void initCache() throws CachingException {
+        logger.debug("Initializing UserCache");
 
+        locks.put("users", new ReentrantLock());
+        locks.put("tickets", new ReentrantLock());
+        cacheTickets();
+        cacheUsers();
+        logger.debug("UserCache successfully initialized");
+    }
+
+    /**
+     * Retrieves all users from the database and instantiates user objects from the {@link ResultSet}
+     * by calling {@link UserFactory#createUsersFromResultSet(ResultSet)}.
+     * @return True, if caching worked, false if the object lock could not be retrieved
+     * @throws CachingException Thrown whenever an exception occurs during caching
+     */
+    private static boolean cacheUsers() throws CachingException {
+        logger.debug("Starting to cache users");
+        if (!tryToAcquireLock("users")) {
+            logger.info("Could not acquire lock on users");
+            return false;
+        }
+        try {
+            DBConnection conn = DBConnectionFactory.newDefaultConnection();
+            DBQuery q = DBQueryFactory.createSelectQuery("SELECT * FROM users");
+
+            logger.debug("Instantiated query and connection to database for caching tickets");
+            ResultSet rs = conn.execute(q);
+            logger.debug("Retrieved tickets from database");
+            ArrayList<User> usr = UserFactory.createUsersFromResultSet(rs);
+            for (User u : usr) {
+                users.put(u.getId(), u);
+            }
+            logger.debug("Added all users in db to cache");
+        } catch (Exception ex) {
+            LoggingUtils.logException(ex, logger);
+            unlock("users");
+            throw new CachingException(ex, "User cache could not be initialized");
+        }
+        unlock("users");
+        return true;
+    }
+
+    /**
+     * Retrieves all tickets from the database and instantiates {@link UserTicket} objects from the {@link ResultSet}
+     * by calling {@link UserTicketFactory#createFromResultSet(ResultSet)}.
+     * @return True, if caching worked, false if the object lock could not be retrieved
+     * @throws CachingException Thrown whenever an exception occurs during caching
+     */
+    private static boolean cacheTickets() throws CachingException {
+        logger.debug("Caching tickets");
+        if (!tryToAcquireLock("tickets")) {
+            logger.debug("Could not acquire lock for tickets");
+            return false;
+        }
+        try {
+            DBConnection conn = DBConnectionFactory.newDefaultConnection();
+            DBQuery q = DBQueryFactory.createSelectQuery("SELECT * FROM ticket");
+
+            logger.debug("Instantiated query and connection to database for caching tickets");
+            ResultSet rs = conn.execute(q);
+            logger.debug("Retrieved tickets from database");
+
+            ArrayList<UserTicket> tck = UserTicketFactory.createFromResultSet(rs);
+            for (var ticket : tck) {
+                tickets.put(ticket.getTicket(), ticket);
+            }
+        } catch (Exception ex) {
+            LoggingUtils.logException(ex, logger);
+            unlock("tickets");
+            throw new CachingException(ex, "Cache could not be initialized");
+        }
+        unlock("tickets");
+        return true;
     }
 }

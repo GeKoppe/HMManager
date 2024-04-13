@@ -37,7 +37,7 @@ public final class HMManager {
 
     private static void loadConfigs() throws CachingException {
         try {
-            ConfigCache.loadDbConfig();
+            ConfigCache.initCaches();
         } catch (Exception ex) {
             LoggingUtils.logException(ex, logger);
             throw new CachingException(

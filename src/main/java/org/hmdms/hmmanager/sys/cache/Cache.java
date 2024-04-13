@@ -1,10 +1,12 @@
 package org.hmdms.hmmanager.sys.cache;
 
 import org.hmdms.hmmanager.sys.StateC;
+import org.hmdms.hmmanager.utils.LoggingUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
 // TODO this is probably better implemented as an interface
@@ -23,6 +25,9 @@ public abstract class Cache {
      */
     protected static HashMap<String, ReentrantLock> locks = new HashMap<>();
 
+    /**
+     * State of the cache
+     */
     protected static StateC state;
     /**
      * Default constructor
@@ -36,5 +41,54 @@ public abstract class Cache {
      */
     public static boolean invalidate() {
         return true;
+    }
+
+    /**
+     * Tries to acquire lock with the given id
+     * @param lockId ID of the lock that should be acquired
+     * @return True, if locking worked, false otherwise
+     * @throws IllegalArgumentException When null or an empty string is given in {@param lockId} or no lock
+     * with given id exists
+     */
+    protected static boolean tryToAcquireLock(String lockId) throws IllegalArgumentException {
+        logger.trace("Thread " + Thread.currentThread() + " trying to acquire lock for id " + lockId);
+        if (lockId == null || lockId.isEmpty()) {
+            throw new IllegalArgumentException("No lockId given");
+        }
+        if (locks.get(lockId) == null) {
+            throw new IllegalArgumentException("No lock with lockId " + lockId + " defined");
+        }
+
+        if (!locks.get(lockId).isHeldByCurrentThread()) {
+            try {
+                if (!locks.get(lockId).tryLock(200, TimeUnit.MILLISECONDS)) {
+                    logger.trace("Lock " + locks.get(lockId) + " could not be acquired, still held by other thread");
+                    return false;
+                }
+                logger.trace("Lock " + locks.get(lockId) + " now held by " + Thread.currentThread());
+            } catch (Exception ex) {
+                LoggingUtils.logException(ex, logger);
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Unlocks the lock with given {@param lockId}
+     * @param lockId The lock to be unlocked
+     * @throws IllegalArgumentException When null or an empty string is given in {@param lockId} or no lock
+     * with given id exists
+     */
+    protected static void unlock(String lockId) throws IllegalArgumentException {
+        logger.trace("Thread " + Thread.currentThread() + " trying to release lock for id " + lockId);
+        if (lockId == null || lockId.isEmpty()) {
+            throw new IllegalArgumentException("No lockId given");
+        }
+        if (locks.get(lockId) == null) {
+            throw new IllegalArgumentException("No lock with lockId " + lockId + " defined");
+        }
+
+        if (locks.get(lockId).isHeldByCurrentThread()) locks.get(lockId).unlock();
     }
 }

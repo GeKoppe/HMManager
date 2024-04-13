@@ -1,5 +1,7 @@
 package org.hmdms.hmmanager.core.user;
 
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,7 +17,7 @@ public abstract class UserTicketFactory {
     /**
      * Logger
      */
-    private static Logger logger = LoggerFactory.getLogger(UserTicketFactory.class);
+    private static final Logger logger = LoggerFactory.getLogger(UserTicketFactory.class);
 
     /**
      * Default constructor
@@ -26,7 +28,8 @@ public abstract class UserTicketFactory {
      * Creates an empty {@link UserTicket} object
      * @return A new, empty {@link UserTicket} object
      */
-    public static UserTicket createDefaultTicket() {
+    @Contract(value = " -> new", pure = true)
+    public static @NotNull UserTicket createDefaultTicket() {
         return new UserTicket();
     }
 
@@ -39,7 +42,7 @@ public abstract class UserTicketFactory {
      * @return List of all instantiated {@link UserTicket} objects
      * @throws SQLException When something goes wrong during reading of {@param rs}.
      */
-    public static ArrayList<UserTicket> createFromResultset(ResultSet rs) throws SQLException {
+    public static @NotNull ArrayList<UserTicket> createFromResultSet(@NotNull ResultSet rs) throws SQLException {
         logger.debug("Instantiating usertickets from ResultSet");
         ArrayList<UserTicket> tickets = new ArrayList<>();
         while (rs.next()) {
