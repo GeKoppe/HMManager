@@ -34,6 +34,7 @@ public abstract class UserService extends Service {
      * Default constructor
      */
     public UserService() { }
+
     /**
      * Logs the user with username {@param userName} onto the system by generating an access ticket.
      * @param userName Name of the user to login
@@ -45,31 +46,18 @@ public abstract class UserService extends Service {
     public static UserTicket login(String userName, String pw) throws SQLException, IOException, UserNotFoundException {
         UserTicket ticket;
         try {
+            User user = UserCache.getUser(userName, false);
+            if (user == null) {
+                logger.warn(String.format("User with name %s does not exist in the system", userName));
+                throw new UserNotFoundException("User with name %s does not exist in the system");
+            }
+
             if (!userMatchesPw(userName, pw)) {
                 logger.info("Username and pw do not match, won't create a ticket");
                 throw new IllegalArgumentException("Username and pw do not match");
             }
-            DBConnection conn = DBConnectionFactory.newDefaultConnection();
-            DBQuery query = DBQueryFactory.createSelectQuery(String.format("SELECT user_id FROM users WHERE user_name = '%s'", userName));
-            ResultSet rs = conn.execute(query);
 
-            if (rs.last()) {
-                if (rs.getRow() != 1) {
-                    logger.debug("More than one row was fetched, cannot exactly match");
-                    rs.close();
-                    // TODO throw a different exception
-                    throw new IllegalArgumentException("More than one user with given username present in db");
-                }
-            } else {
-                logger.debug("No rows where fetched");
-                rs.close();
-                throw new UserNotFoundException("No user with given username present in db");
-            }
-
-            rs.first();
-            String userId = rs.getString(1);
-            rs.close();
-            ticket = createTicket(userId);
+            ticket = createTicket(user.getId());
         } catch (Exception ex) {
             LoggingUtils.logException(ex, logger, "info", "%s occurred while trying to authenticate a user: %s");
             throw ex;
@@ -207,6 +195,8 @@ public abstract class UserService extends Service {
         ticket.setTicket(ticketId);
         ticket.setIssuedAt(nowDate);
         ticket.setValidThru(expiryDate);
+
+        UserCache.addTicket(ticket);
 
         return ticket;
     }

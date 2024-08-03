@@ -125,7 +125,6 @@ public abstract class UserCache extends Cache {
 
         locks.put("users", new ReentrantLock());
         locks.put("tickets", new ReentrantLock());
-        cacheTickets();
         cacheUsers();
         logger.debug("UserCache successfully initialized");
     }
@@ -140,7 +139,7 @@ public abstract class UserCache extends Cache {
         logger.debug("Starting to cache users");
         if (!tryToAcquireLock("users")) {
             logger.info("Could not acquire lock on users");
-            return false;
+            throw new CachingException("Could not acquire lock on users");
         }
         try {
             DBConnection conn = DBConnectionFactory.newDefaultConnection();
@@ -194,5 +193,44 @@ public abstract class UserCache extends Cache {
         }
         unlock("tickets");
         return true;
+    }
+
+    /**
+     * Looks up the name or id of the user in {@link UserCache#users}. Treats {@param nameOrId} as a name, if
+     * {@param id} is false, as an id otherwise
+     * @param nameOrId Name or id of the user that the cache should return
+     * @param id True, if this method is called with an id in {@param nameOrId}, false if it is called with an id
+     * @return User object with given name or id or null, if no such user exists
+     * @throws IllegalArgumentException If {@param nameOrId} is empty
+     * @throws IllegalStateException If the cache could not acquire the lock on the users object
+     */
+    public static User getUser(String nameOrId, boolean id) throws IllegalArgumentException, IllegalStateException {
+        if (!tryToAcquireLock("users")) {
+            logger.info("Could not acquire lock on users");
+            throw new IllegalStateException("Could not acquire lock on users");
+        }
+        if (nameOrId == null || nameOrId.isEmpty()) {
+            logger.info("No name or id given in call to method getUser()");
+            unlock("users");
+            throw new IllegalArgumentException("No name or id given in call to method getUser()");
+        }
+
+        User user = null;
+        if (id) {
+            user = users.get(nameOrId);
+        } else {
+            for (String uid : users.keySet()) {
+                if (users.get(uid).getUserName().equals(nameOrId)) {
+                    user = users.get(uid);
+                    break;
+                }
+            }
+        }
+
+        if (user == null) logger.debug(String.format("User with name or id %s does not exist", nameOrId));
+        else logger.debug(String.format("Found user for name or id %s", nameOrId));
+
+        unlock("users");
+        return user;
     }
 }

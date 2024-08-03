@@ -78,15 +78,14 @@ public class User implements Serializable, IFillable {
             HashMap<String, Integer> columns = new HashMap<>();
 
             // Put column names in a hashmap with their respective column numbers be able to access them easier
-            for (int i = 0; i < rsmd.getColumnCount(); i++) {
+            for (int i = 1; i <= rsmd.getColumnCount(); i++) {
                 columns.put(rsmd.getColumnLabel(i) != null ? rsmd.getColumnLabel(i) : rsmd.getColumnName(i), i);
             }
 
             // Check, if all necessary columns are existent in the resultset
             boolean allColumnsExist = columns.containsKey("user_name")
                     && columns.containsKey("user_id")
-                    && columns.containsKey("locked")
-                    && columns.containsKey("created_at");
+                    && columns.containsKey("locked");
 
             // If a column is missing, return false
             if (!allColumnsExist) {

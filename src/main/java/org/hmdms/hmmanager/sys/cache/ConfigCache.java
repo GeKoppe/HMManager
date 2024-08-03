@@ -131,9 +131,9 @@ public abstract class ConfigCache extends Cache {
         logger.debug("Read the configuration file");
 
         try {
-            sysConfig.put("msg.scaling.brokers", (Integer) prop.get("msg.scaling.brokers"));
-            sysConfig.put("msg.scaling.brokers.autoScaling", (Boolean) prop.get("msg.scaling.brokers.autoScaling"));
-            sysConfig.put("msg.timeout", (Integer) prop.get("msg.timeout"));
+            sysConfig.put("msg.scaling.brokers", Integer.parseInt((String) prop.get("msg.scaling.brokers")));
+            sysConfig.put("msg.scaling.brokers.autoScaling", Boolean.parseBoolean((String) prop.get("msg.scaling.brokers.autoScaling")));
+            sysConfig.put("msg.timeout", Integer.parseInt((String) prop.get("msg.timeout")));
             sysConfig.put("mq.host", (String) prop.get("mq.host"));
             sysConfig.put("mq.hmmanager.queue.name", (String) prop.get("mq.hmmanager.queue.name"));
 
@@ -143,7 +143,7 @@ public abstract class ConfigCache extends Cache {
                     ex,
                     logger,
                     "warn",
-                    "%s exception occurred while reading the database configuration from config.properties: %s"
+                    "%s exception occurred while reading the system configuration from config.properties: %s"
             );
             unlock("sys");
             throw ex;

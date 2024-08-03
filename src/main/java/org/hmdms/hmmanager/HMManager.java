@@ -3,6 +3,7 @@ package org.hmdms.hmmanager;
 import org.hmdms.hmmanager.sys.StateC;
 import org.hmdms.hmmanager.msg.*;
 import org.hmdms.hmmanager.sys.cache.ConfigCache;
+import org.hmdms.hmmanager.sys.cache.UserCache;
 import org.hmdms.hmmanager.sys.exceptions.system.CachingException;
 import org.hmdms.hmmanager.utils.LoggingUtils;
 import org.slf4j.Logger;
@@ -38,6 +39,7 @@ public final class HMManager {
     private static void loadConfigs() throws CachingException {
         try {
             ConfigCache.initCaches();
+            UserCache.initCache();
         } catch (Exception ex) {
             LoggingUtils.logException(ex, logger);
             throw new CachingException(

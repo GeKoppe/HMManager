@@ -22,6 +22,7 @@ public abstract class ClassFinder {
      * Default constructor
      */
     public ClassFinder() { }
+
     /**
      * Scans the package {@link org.hmdms.hmmanager.msg} for all classes, that extend the {@link Subscriber}.
      * Returns class definitions of those classes
