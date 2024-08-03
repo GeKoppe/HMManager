@@ -21,9 +21,22 @@ public abstract class Element implements IFillable {
     protected final String guid;
 
     /**
+     * Name of the element
+     */
+    protected String name;
+    /**
+     * ID of the parent element
+     */
+    protected int parentId;
+    protected int id;
+    /**
      * Metadata of the Element
      */
-    protected final ArrayList<MetaKey> metadata = new ArrayList<>();
+    protected final ArrayList<MetaValue> metadata = new ArrayList<>();
+    /**
+     * Type of this object
+     */
+    protected ElementTypeC elementType;
 
     /**
      * Default constructor. Sets {@link Element#guid} to empty String
@@ -47,7 +60,7 @@ public abstract class Element implements IFillable {
      * @param value
      * @throws IllegalArgumentException
      */
-    public void SetMetaKeyValue(String name, String value) throws IllegalArgumentException {
+    public void setMetaValue(String name, String value) throws IllegalArgumentException {
         if (name == null || name.isEmpty() || value == null || value.isEmpty()) {
             this.logger.warn("Parameters insufficiently filled to set metakey value");
             throw new IllegalArgumentException("Parameters insufficiently filled to set metakey value");

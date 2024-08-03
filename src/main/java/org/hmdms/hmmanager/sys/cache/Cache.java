@@ -6,6 +6,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -19,7 +21,10 @@ public abstract class Cache {
      * Logger
      */
     private static final Logger logger = LoggerFactory.getLogger(Cache.class);
-
+    /**
+     * Service to do config loading asynchronously
+     */
+    protected static ExecutorService ex = Executors.newFixedThreadPool(5);
     /**
      * Locks for objects
      */
@@ -29,6 +34,8 @@ public abstract class Cache {
      * State of the cache
      */
     protected static StateC state;
+
+    protected static boolean cacheInitialized = false;
     /**
      * Default constructor
      */

@@ -1,34 +1,113 @@
 -- Create the database
-CREATE DATABASE hmdms;
-
-GO
-
-USE hmdms;
-
-GO
+-- CREATE DATABASE hmdms;
 
 -- AUTH TABLES
 
 -- Table containing all users
-CREATE TABLE users (
-    user_id nvarchar(255) PRIMARY KEY,
-    user_name nvarchar(255) NOT NULL UNIQUE,
-    pw nvarchar(255) NOT NULL,
+CREATE TABLE "users" (
+    user_id varchar(255) PRIMARY KEY,
+    user_name varchar(255) NOT NULL UNIQUE,
+    pw varchar(255) NOT NULL,
     locked boolean NOT NULL
 );
 
 CREATE TABLE tickets (
-    ticket nvarchar(255) PRIMARY KEY,
-    user_id nvarchar(255) NOT NULL,
-    issued_at datetime NOT NULL,
-    valid_thru datetime NOT NULL
+    ticket varchar(255) PRIMARY KEY,
+    user_id varchar(255) NOT NULL,
+    issued_at timestamp NOT NULL,
+    valid_thru timestamp NOT NULL
 );
 
-GO
+
 
 ALTER TABLE tickets
-ADD CONSTRAINT FK_tick_user_id FOREIGN KEY (user_id) REFERENCES(users.user_id);
+	ADD CONSTRAINT FK_tick_user_id FOREIGN KEY (user_id) REFERENCES "users"(user_id);
 
-GO
+CREATE INDEX I_users_name
+ON "users" (user_name);
 
-INSERT INTO users
+
+
+-- META TABLES
+-- Elements in the System
+CREATE TABLE "elements" (
+    id int PRIMARY KEY,
+    "guid" varchar(255) NOT NULL UNIQUE,
+    "name" varchar(255) NOT NULL,
+    parent_id int NOT NULL,
+    meta_set_id int NOT NULL,
+    "type" int NOT NULL
+);
+
+CREATE TABLE meta_sets (
+    id int PRIMARY KEY,
+    "name" varchar(255) NOT NULL UNIQUE,
+    last_changed date NOT NULL
+);
+
+CREATE TABLE meta_keys (
+    id int PRIMARY KEY, -- id of the meta key
+    "name" varchar(255) NOT NULL UNIQUE, -- name of the meta key, indexed
+    "type" varchar(255) NOT NULL, -- type of the meta key (date, string etc)
+    last_changed date NOT NULL -- time this was last edited
+);
+
+CREATE TABLE meta_set_keys (
+    meta_set_id int NOT NULL, -- Reference to meta_sets(id)
+    meta_key_id int NOT NULL, -- Reference to meta_keys(id)
+    "index" int NOT NULL -- index of the meta key in the meta set
+);
+
+-- Table containing meta values for each element
+CREATE TABLE meta_values (
+    element_id int NOT NULL, -- Reference to elements(id)
+    meta_key_id int NOT NULL, -- Reference to meta_keys(id)
+    "value" varchar(255) NOT NULL
+);
+
+
+
+-- ADD KEYS to elements
+ALTER TABLE "elements"
+    ADD CONSTRAINT FK_el_ms FOREIGN KEY (meta_set_id) REFERENCES meta_sets(id);
+
+-- ADD KEYS TO meta_set_keys
+ALTER TABLE meta_set_keys
+    ADD CONSTRAINT PK_meta_set_keys PRIMARY KEY (meta_set_id, meta_key_id);
+
+ALTER TABLE meta_set_keys
+    ADD CONSTRAINT FK_msk_ms FOREIGN KEY (meta_set_id) REFERENCES meta_sets(id);
+
+ALTER TABLE meta_set_keys
+    ADD CONSTRAINT FK_msk_mk FOREIGN KEY (meta_key_id) REFERENCES meta_keys(id);
+
+
+
+-- ADD KEYS TO meta_values
+ALTER TABLE meta_values
+    ADD CONSTRAINT PK_meta_values PRIMARY KEY (element_id, meta_key_id);
+
+ALTER TABLE meta_values
+    ADD CONSTRAINT FK_mv_el FOREIGN KEY (element_id) REFERENCES "elements"(id);
+
+ALTER TABLE meta_values
+    ADD CONSTRAINT FK_mv_mk FOREIGN KEY (meta_key_id) REFERENCES meta_keys(id);
+
+
+
+-- ADD INDICES
+CREATE INDEX I_el_guid
+ON "elements" ("guid");
+
+CREATE INDEX I_el_parent
+ON "elements" ("parent_id");
+
+CREATE INDEX I_el_name
+ON "elements" ("name");
+
+CREATE INDEX I_mk_name
+ON meta_keys ("name");
+
+CREATE INDEX I_ms_name
+ON meta_sets ("name")
+
