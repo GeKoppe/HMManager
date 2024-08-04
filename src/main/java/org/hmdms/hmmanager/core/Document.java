@@ -1,39 +1,36 @@
 package org.hmdms.hmmanager.core;
 
+import org.hmdms.hmmanager.db.IFillable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.ResultSet;
 
-/**
- * Class encapsulating all information for documents
- */
-public class Document extends Element {
-
+public class Document implements IFillable {
     /**
      * Logger
      */
     private final Logger logger = LoggerFactory.getLogger(Document.class);
+    /**
+     * ID of the document
+     */
+    private String id;
+    /**
+     * ID of the element this document is linked to
+     */
+    private int elementId;
+    /**
+     * Version of this document
+     */
+    private float version;
+    /**
+     * ID of the document path this document is in
+     */
+    private int documentPath;
 
-    /**
-     * Default constructor
-     */
-    public Document() {
-        super();
-    }
-    /**
-     * Constructor setting super classes {@link Element#guid} to 'guid'
-     * @param guid Guid of the element
-     */
-    public Document(String guid) {
-        super(guid);
-    }
+    public Document() { }
+    
 
-    /**
-     * TODO Implement
-     * @param rs ResultSet from which to fill the IFillable
-     * @return
-     */
     @Override
     public boolean fillFromResultSet(ResultSet rs) {
         return false;

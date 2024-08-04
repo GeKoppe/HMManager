@@ -9,8 +9,6 @@ import org.hmdms.hmmanager.utils.LoggingUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.ObjectInputFilter;
-
 public final class HMManager {
     private static final Logger logger = LoggerFactory.getLogger(HMManager.class);
     private static StateC state = StateC.WORKING;

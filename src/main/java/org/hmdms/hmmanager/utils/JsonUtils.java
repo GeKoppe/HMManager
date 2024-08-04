@@ -46,14 +46,9 @@ public abstract class JsonUtils {
                 return false;
             }
         }
-        if (currentNode != null) {
-            // TODO better check what node.get returns, when the next part does not exist
-            logger.debug("Given json has property that was checked");
-            return true;
-        } else {
-            logger.debug("Given json does not have property that was checked");
-            return false;
-        }
+        // TODO better check what node.get returns, when the next part does not exist
+        logger.debug("Given json has property that was checked");
+        return true;
     }
 
     /**
