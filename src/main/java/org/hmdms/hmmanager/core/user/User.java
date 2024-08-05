@@ -27,7 +27,7 @@ public class User implements Serializable, IFillable {
     /**
      * ID of the user
      */
-    private String id;
+    private int id;
     /**
      * Date, at which the user was created
      */
@@ -51,7 +51,7 @@ public class User implements Serializable, IFillable {
      * @param createdAt Date of user creation
      * @param locked True, if the user is locked from the system
      */
-    public User(String userName, String id, Date createdAt, boolean locked) {
+    public User(String userName, int id, Date createdAt, boolean locked) {
         this.userName = userName;
         this.id = id;
         this.createdAt = createdAt;
@@ -95,7 +95,7 @@ public class User implements Serializable, IFillable {
 
             // Set class value from resultset
             this.setUserName(rs.getString(columns.get("user_name")));
-            this.setId(rs.getString(columns.get("user_id")));
+            this.setId(rs.getInt(columns.get("user_id")));
             this.setLocked(rs.getBoolean(columns.get("locked")));
             this.setCreatedAt(rs.getDate(columns.get("created_at")));
 
@@ -150,7 +150,7 @@ public class User implements Serializable, IFillable {
      * Gets id of this user
      * @return id of this user
      */
-    public String getId() {
+    public int getId() {
         return id;
     }
 
@@ -158,7 +158,7 @@ public class User implements Serializable, IFillable {
      * Sets id of this user
      * @param id id of this user
      */
-    public void setId(String id) {
+    public void setId(int id) {
         this.id = id;
     }
 
@@ -213,7 +213,8 @@ public class User implements Serializable, IFillable {
      * @return new instance of this class with the same values in class fields
      */
     @Override
-    public User clone() {
+    public User clone() throws CloneNotSupportedException {
+        User user = (User) super.clone();
         User u = new User();
         u.setId(this.id);
         u.setLocked(this.locked);

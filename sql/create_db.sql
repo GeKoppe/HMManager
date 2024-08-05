@@ -5,7 +5,7 @@
 
 -- Table containing all users
 CREATE TABLE "users" (
-    user_id int PRIMARY KEY,
+    user_id SERIAL PRIMARY KEY,
     user_name varchar(255) NOT NULL UNIQUE,
     pw varchar(255) NOT NULL,
     locked boolean NOT NULL,
@@ -24,10 +24,10 @@ CREATE TABLE tickets (
 -- META TABLES
 -- Elements in the System
 CREATE TABLE "elements" (
-    id int PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     "guid" varchar(255) NOT NULL UNIQUE,
     "name" varchar(255) NOT NULL,
-    parent_id int NOT NULL,
+    parent_id int,
     meta_set_id int NOT NULL,
     "type" int NOT NULL,
     document_id varchar(255),
@@ -36,13 +36,13 @@ CREATE TABLE "elements" (
 );
 
 CREATE TABLE meta_sets (
-    id int PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     "name" varchar(255) NOT NULL UNIQUE,
     last_changed timestamp NOT NULL
 );
 
 CREATE TABLE meta_keys (
-    id int PRIMARY KEY, -- id of the meta key
+    id SERIAL PRIMARY KEY, -- id of the meta key
     "name" varchar(255) NOT NULL UNIQUE, -- name of the meta key, indexed
     "type" varchar(255) NOT NULL, -- type of the meta key (date, string etc)
     last_changed date NOT NULL -- time this was last edited
@@ -62,7 +62,7 @@ CREATE TABLE meta_values (
 );
 
 CREATE TABLE element_types (
-    id int PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     "name" varchar(255) NOT NULL UNIQUE
 );
 
@@ -75,7 +75,7 @@ CREATE TABLE "documents" (
 );
 
 CREATE TABLE document_paths (
-    id int PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     path varchar(255) NOT NULL UNIQUE
 );
 
