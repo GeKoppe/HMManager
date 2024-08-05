@@ -4,6 +4,7 @@ import org.hmdms.hmmanager.db.IFillable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Serializable;
 import java.sql.ResultSet;
 import java.util.ArrayList;
 
@@ -11,7 +12,7 @@ import java.util.ArrayList;
  * Definition of a MetaSet
  * Contains all information about name, id, MetaKeys and so on
  */
-public class MetaSet implements IFillable {
+public class MetaSet implements IFillable, Serializable {
     /**
      * Logger
      */

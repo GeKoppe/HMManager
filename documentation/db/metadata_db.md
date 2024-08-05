@@ -64,6 +64,12 @@ documents {
     version float "not null"
     document_path int "fk document_paths(id)"
     document_date timestamp "not null"
+    extension string "fk document_types(id)"
+}
+
+document_types {
+    id int pk
+    extension string "not null, unique"
 }
 
 document_paths {
@@ -87,5 +93,8 @@ documents }|--|| document_paths: "lies in"
 
 users ||--|{ ticket: "Has"
 elements }|--|| users: "Created by"
+elements ||--|| references: "Is referenced to"
+
+documents }|--|| document_types: "Is of type"
 
 ```

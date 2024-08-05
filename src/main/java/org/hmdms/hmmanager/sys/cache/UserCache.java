@@ -10,12 +10,14 @@ import org.hmdms.hmmanager.db.DBQuery;
 import org.hmdms.hmmanager.db.DBQueryFactory;
 import org.hmdms.hmmanager.sys.exceptions.system.CachingException;
 import org.hmdms.hmmanager.utils.LoggingUtils;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.concurrent.Future;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
@@ -123,10 +125,32 @@ public abstract class UserCache extends Cache {
     public static void initCache() throws CachingException {
         logger.debug("Initializing UserCache");
 
-        locks.put("users", new ReentrantLock());
-        locks.put("tickets", new ReentrantLock());
+        initLocks();
         cacheUsers();
         logger.debug("UserCache successfully initialized");
+    }
+
+    public static @NotNull Future<Boolean> initCachesAsync() {
+        initLocks();
+
+        return ex.submit(() -> {
+            Future<Boolean> users = ex.submit(UserCache::cacheUsers);
+            Future<Boolean> tickets = ex.submit(UserCache::cacheTickets);
+
+            try {
+                users.wait();
+                tickets.wait();
+            } catch (InterruptedException e) {
+                LoggingUtils.logException(e, logger);
+                throw new RuntimeException(e);
+            }
+            return users.get() && tickets.get();
+        });
+    }
+
+    private static void initLocks() {
+        locks.put("users", new ReentrantLock());
+        locks.put("tickets", new ReentrantLock());
     }
 
     /**

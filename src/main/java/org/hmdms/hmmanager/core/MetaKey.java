@@ -11,7 +11,7 @@ import java.sql.ResultSet;
 /**
  * Encapsulates one meta information of an element
  */
-public class MetaKey implements IFillable {
+public class MetaKey implements IFillable, Serializable {
     /**
      * Logger
      */

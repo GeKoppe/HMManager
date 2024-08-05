@@ -2,6 +2,7 @@ package org.hmdms.hmmanager.sys.cache;
 
 import org.hmdms.hmmanager.sys.exceptions.system.CachingException;
 import org.hmdms.hmmanager.utils.LoggingUtils;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -9,6 +10,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Properties;
+import java.util.concurrent.Future;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
@@ -82,7 +84,7 @@ public abstract class ConfigCache extends Cache {
      * @throws IOException Is thrown, when reading the file failed for some reason.
      * @throws CachingException Is thrown, when the lock on the db config object could not be acquired
      */
-    private static void loadDbConfig() throws IOException, CachingException {
+    private static boolean loadDbConfig() throws IOException, CachingException {
         if (!tryToAcquireLock("db")) {
             logger.warn("Could not acquire lock on sysConfig");
             throw new CachingException("Could not acquire lock on sysConfig");
@@ -110,6 +112,7 @@ public abstract class ConfigCache extends Cache {
             throw ex;
         }
         unlock("db");
+        return true;
     }
 
     /**
@@ -118,7 +121,7 @@ public abstract class ConfigCache extends Cache {
      * @throws IOException Thrown when the config.properties file could not be read
      * @throws CachingException Thrown, when something went wrong during caching
      */
-    private static void loadSysConfig() throws IOException, CachingException {
+    private static boolean loadSysConfig() throws IOException, CachingException {
         if (!tryToAcquireLock("sys")) {
             logger.warn("Could not acquire lock on sysConfig");
             throw new CachingException("Could not acquire lock on sysConfig");
@@ -150,6 +153,7 @@ public abstract class ConfigCache extends Cache {
         }
         unlock("sys");
         logger.debug("Successfully loaded system config into cache");
+        return true;
     }
 
     /**
@@ -159,9 +163,25 @@ public abstract class ConfigCache extends Cache {
      * @throws CachingException Thrown when something went wrong while caching
      */
     public static void initCaches() throws IOException, CachingException {
-        locks.put("sys", new ReentrantLock());
-        locks.put("db",  new ReentrantLock());
+        initLocks();
         loadSysConfig();
         loadDbConfig();
+    }
+
+    public static @NotNull Future<Boolean> initCachesAsync() {
+        initLocks();
+
+        return ex.submit(() -> {
+            Future<Boolean> sys = ex.submit(ConfigCache::loadSysConfig);
+            Future<Boolean> db = ex.submit(ConfigCache::loadDbConfig);
+            sys.wait();
+            db.wait();
+            return sys.get() && db.get();
+        });
+    }
+
+    private static void initLocks() {
+        locks.put("sys", new ReentrantLock());
+        locks.put("db",  new ReentrantLock());
     }
 }

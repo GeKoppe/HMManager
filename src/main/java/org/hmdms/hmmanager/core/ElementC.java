@@ -2,16 +2,23 @@ package org.hmdms.hmmanager.core;
 
 public enum ElementC {
     /**
-     * Refers to only the id property of {@link Element}
+     * Refers to id property of {@link Element}
      */
-    ONLY_ID,
+    ID,
     /**
      *
      */
-    ONLY_METADATA,
+    METADATA,
+    /**
+     *
+     */
+    REFERENCES,
+    /**
+     *
+     */
+    DOCUMENT,
     /**
      * Refers to all properties of {@link Element} Class
      */
     ALL_ELEMENT,
-
 }

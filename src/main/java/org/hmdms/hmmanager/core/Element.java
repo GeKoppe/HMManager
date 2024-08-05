@@ -4,6 +4,7 @@ import org.hmdms.hmmanager.db.IFillable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Serializable;
 import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.Date;
@@ -12,7 +13,7 @@ import java.util.Objects;
 /**
  * Base class for all elements in the system.
  */
-public class Element implements IFillable {
+public class Element implements IFillable, Serializable {
     /**
      * Logger
      */

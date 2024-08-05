@@ -29,7 +29,7 @@ public abstract class DBConnectionFactory {
      * @throws IOException Thrown when an exception occurs during the read of the db_config.properties file
      */
     @Contract(" -> new")
-    public static @NotNull DBConnection newDefaultConnection() throws IOException {
+    public static @NotNull DBConnection newDefaultConnection() {
         try {
             return new DBConnection();
         } catch (Exception ex) {
