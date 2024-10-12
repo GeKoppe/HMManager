@@ -174,8 +174,11 @@ public abstract class ConfigCache extends Cache {
         return ex.submit(() -> {
             Future<Boolean> sys = ex.submit(ConfigCache::loadSysConfig);
             Future<Boolean> db = ex.submit(ConfigCache::loadDbConfig);
-            sys.wait();
-            db.wait();
+            while (!sys.isDone() && !db.isDone()) {
+                logger.trace("Loading configs...");
+                //noinspection BusyWait
+                Thread.sleep(50);
+            }
             return sys.get() && db.get();
         });
     }

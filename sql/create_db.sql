@@ -71,12 +71,13 @@ CREATE TABLE "documents" (
     element_id int NOT NULL,
     "version" float NOT NULL,
     document_path int NOT NULL,
-    document_date timestamp NOT NULL
+    document_date timestamp NOT NULL,
+    extension varchar(10) NOT NULL
 );
 
 CREATE TABLE document_paths (
     id SERIAL PRIMARY KEY,
-    path varchar(255) NOT NULL UNIQUE
+    "path" varchar(255) NOT NULL UNIQUE
 );
 
 -- ADD KEYS to tickets

@@ -1,13 +1,16 @@
 package org.hmdms.hmmanager.core;
 
 import org.hmdms.hmmanager.db.IFillable;
+import org.hmdms.hmmanager.utils.LoggingUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Objects;
 
 /**
@@ -215,8 +218,52 @@ public class Element implements IFillable, Serializable {
         return Objects.hash(getGuid(), getId());
     }
 
+    /**
+     * {@inheritDoc}
+     * In this case, the necessary columns are:
+     * user_name (String), user_id (String), locked (boolean), created_at ({@link Date})
+     * @param rs ResultSet from which to fill the object.
+     *           Cursor of the resultset must be on the row, with which the user should be filled
+     * @return True, if filling was successful, false otherwise
+     */
     @Override
     public boolean fillFromResultSet(ResultSet rs) {
-        return false;
+        boolean result = false;
+
+        this.logger.debug("Filling object from resultset");
+        try {
+            // Get metadata from the resultset and read the column names / labels
+            ResultSetMetaData rsmd = rs.getMetaData();
+            HashMap<String, Integer> columns = new HashMap<>();
+
+            // Put column names in a hashmap with their respective column numbers be able to access them easier
+            for (int i = 1; i <= rsmd.getColumnCount(); i++) {
+                columns.put(rsmd.getColumnLabel(i) != null ? rsmd.getColumnLabel(i) : rsmd.getColumnName(i), i);
+            }
+
+            // Check, if all necessary columns are existent in the resultset
+            boolean allColumnsExist = columns.containsKey("id")
+                    && columns.containsKey("guid")
+                    && columns.containsKey("name");
+
+            // If a column is missing, return false
+            if (!allColumnsExist) {
+                this.logger.debug("Missing columns for filling");
+                return result;
+            }
+
+            // Set class value from resultset
+            this.setId(rs.getInt(columns.get("id")));
+            this.setGuid(rs.getString(columns.get("guid")));
+            this.setName(rs.getString(columns.get("name")));
+
+            // Set result to true to show, that the filling worked
+            result = true;
+        } catch (Exception ex) {
+            LoggingUtils.logException(ex, this.logger);
+            return false;
+        }
+
+        return result;
     }
 }

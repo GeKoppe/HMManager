@@ -41,7 +41,7 @@ public abstract class UserCache extends Cache {
     /**
      * Map of all users that exist in the system. Key is user id, value is the corresponding UserObject
      */
-    private static final HashMap<String, User> users = new HashMap<>();
+    private static final HashMap<Integer, User> users = new HashMap<>();
 
     /**
      * Default constructor
@@ -111,7 +111,7 @@ public abstract class UserCache extends Cache {
             throw new IllegalArgumentException("No username given");
         }
         boolean result = false;
-        for (String id : users.keySet()) {
+        for (Integer id : users.keySet()) {
             if (users.get(id).getUserName().equals(name)) {
                 result = true;
                 break;
@@ -138,8 +138,11 @@ public abstract class UserCache extends Cache {
             Future<Boolean> tickets = ex.submit(UserCache::cacheTickets);
 
             try {
-                users.wait();
-                tickets.wait();
+                while (!users.isDone() && !tickets.isDone()) {
+                    logger.trace("Loading configs...");
+                    //noinspection BusyWait
+                    Thread.sleep(50);
+                }
             } catch (InterruptedException e) {
                 LoggingUtils.logException(e, logger);
                 throw new RuntimeException(e);
@@ -243,7 +246,7 @@ public abstract class UserCache extends Cache {
         if (id) {
             user = users.get(nameOrId);
         } else {
-            for (String uid : users.keySet()) {
+            for (Integer uid : users.keySet()) {
                 if (users.get(uid).getUserName().equals(nameOrId)) {
                     user = users.get(uid);
                     break;

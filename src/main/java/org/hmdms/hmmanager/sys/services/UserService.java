@@ -57,7 +57,7 @@ public abstract class UserService extends Service {
                 throw new IllegalArgumentException("Username and pw do not match");
             }
 
-            ticket = createTicket(user.getId());
+            ticket = createTicket("" + user.getId());
         } catch (Exception ex) {
             LoggingUtils.logException(ex, logger, "info", "%s occurred while trying to authenticate a user: %s");
             throw ex;

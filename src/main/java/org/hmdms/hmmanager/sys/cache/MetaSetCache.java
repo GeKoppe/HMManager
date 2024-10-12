@@ -112,7 +112,7 @@ public class MetaSetCache extends Cache {
             logger.debug("Retrieved all MetaSet definitions");
 
             fillMetaSetCache(rs);
-        } catch (IOException | SQLException e) {
+        } catch (SQLException e) {
             LoggingUtils.logException(e, logger, "warn");
             return false;
         }

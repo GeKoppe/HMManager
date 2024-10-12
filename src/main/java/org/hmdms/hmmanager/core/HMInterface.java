@@ -101,7 +101,9 @@ public class HMInterface {
         try {
             this.logger.debug("Waiting for all futures to complete");
             for (var c : checkouts.keySet()) {
-                checkouts.get(c).wait();
+                while (!checkouts.get(c).isDone()) {
+                    this.logger.debug(String.format("Waiting for checkout %s", c));
+                }
             }
         } catch (Exception ex) {
             LoggingUtils.logException(ex, this.logger);
@@ -143,7 +145,7 @@ public class HMInterface {
             return null;
         }
 
-        if (!(el.getGuid() == null || el.getGuid().isEmpty())) {
+        if (el.getGuid() == null || el.getGuid().isEmpty()) {
             this.logger.info(String.format("No records found for id %s", id));
             return null;
         }
