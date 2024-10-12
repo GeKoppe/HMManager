@@ -29,8 +29,15 @@ public class HMInterface {
      */
     private final ExecutorService ex = Executors.newFixedThreadPool(10);
 
+    /**
+     * ExecutionContext, this interface uses
+     */
     private ExecutionContext ec;
 
+    /**
+     * Default constructor
+     * @param ec ExecutionContext this interface should use
+     */
     public HMInterface(ExecutionContext ec) {
         this.ec = ec;
     }
@@ -155,8 +162,9 @@ public class HMInterface {
     public Future<Document> getDocumentForElementAsync(String elementId, float version) {
         return this.ex.submit(() -> this.getDocumentForElement(elementId, version));
     }
+
     /**
-     *
+     * Returns document for element with given elementid
      * @param elementId
      * @param version
      * @return
@@ -207,6 +215,12 @@ public class HMInterface {
         return doc;
     }
 
+    /**
+     * Retrieves
+     * @param elementId
+     * @param keyNames
+     * @return
+     */
     public Future<ArrayList<MetaValue>> getMetaValuesForElementAsync(String elementId, String[] keyNames) {
         return this.ex.submit(() -> this.getMetaValuesForElement(elementId, keyNames));
     }

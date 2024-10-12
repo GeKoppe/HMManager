@@ -118,101 +118,208 @@ public class Element implements IFillable, Serializable {
         }
     }
 
+    /**
+     * Gets the GUID of the element.
+     *
+     * @return the GUID of this element.
+     */
     public String getGuid() {
         return guid;
     }
 
+    /**
+     * Sets the GUID of the element.
+     *
+     * @param guid the new GUID to set.
+     */
     public void setGuid(String guid) {
         this.guid = guid;
     }
 
+    /**
+     * Gets the name of the element.
+     *
+     * @return the name of the element.
+     */
     public String getName() {
         return name;
     }
 
+    /**
+     * Sets the name of the element.
+     *
+     * @param name the new name to set.
+     */
     public void setName(String name) {
         this.name = name;
     }
 
+    /**
+     * Gets the ID of the parent element.
+     *
+     * @return the parent ID of this element.
+     */
     public int getParentId() {
         return parentId;
     }
 
+    /**
+     * Sets the ID of the parent element.
+     *
+     * @param parentId the new parent ID to set.
+     */
     public void setParentId(int parentId) {
         this.parentId = parentId;
     }
 
+    /**
+     * Gets the ID of the element.
+     *
+     * @return the ID of the element.
+     */
     public int getId() {
         return id;
     }
 
+    /**
+     * Sets the ID of the element.
+     *
+     * @param id the new ID to set.
+     */
     public void setId(int id) {
         this.id = id;
     }
 
+    /**
+     * Gets the ID of the {@link MetaSet} associated with this element.
+     *
+     * @return the metaSetId of the element.
+     */
     public int getMetaSetId() {
         return metaSetId;
     }
 
+    /**
+     * Sets the ID of the {@link MetaSet} associated with this element.
+     *
+     * @param metaSetId the new metaSetId to set.
+     */
     public void setMetaSetId(int metaSetId) {
         this.metaSetId = metaSetId;
     }
 
+    /**
+     * Gets the metadata of the element.
+     *
+     * @return the list of {@link MetaValue} objects associated with this element.
+     */
     public ArrayList<MetaValue> getMetadata() {
         return metadata;
     }
 
+    /**
+     * Gets the element type of this object.
+     *
+     * @return the element type as an integer.
+     */
     public int getElementType() {
         return elementType;
     }
 
+    /**
+     * Sets the element type of this object.
+     *
+     * @param elementType the new element type to set.
+     */
     public void setElementType(int elementType) {
         this.elementType = elementType;
     }
 
+    /**
+     * Gets the document ID if this element refers to a document.
+     *
+     * @return the document ID associated with this element.
+     */
     public String getDocumentId() {
         return documentId;
     }
 
+    /**
+     * Sets the document ID for this element.
+     *
+     * @param documentId the new document ID to set.
+     */
     public void setDocumentId(String documentId) {
         this.documentId = documentId;
     }
 
+    /**
+     * Gets the internal creation date of the element.
+     *
+     * @return the internal date when the element was first created.
+     */
     public Date getInternalDate() {
         return internalDate;
     }
 
+    /**
+     * Sets the internal creation date of the element.
+     *
+     * @param internalDate the new internal date to set.
+     */
     public void setInternalDate(Date internalDate) {
         this.internalDate = internalDate;
     }
 
+    /**
+     * Gets the creator ID of the element.
+     *
+     * @return the creator ID associated with this element.
+     */
     public int getCreator() {
         return creator;
     }
 
+    /**
+     * Sets the creator ID of the element.
+     *
+     * @param creator the new creator ID to set.
+     */
     public void setCreator(int creator) {
         this.creator = creator;
     }
 
+    /**
+     * Gets the references of the element.
+     *
+     * @return an array of parent IDs this element references.
+     */
     public int[] getReferences() {
         return references;
     }
 
+    /**
+     * Gets the document object that this element represents.
+     *
+     * @return the {@link Document} object associated with this element.
+     */
     public Document getDocument() {
         return document;
     }
 
+    /**
+     * Sets the document object that this element represents.
+     *
+     * @param document the new {@link Document} object to set.
+     */
     public void setDocument(Document document) {
         this.document = document;
     }
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (!(o instanceof Element element)) return false;
-        return getId() == element.getId() && Objects.equals(getGuid(), element.getGuid());
-    }
-
+    /**
+     * {@inheritDoc}
+     * @return
+     */
     @Override
     public int hashCode() {
         return Objects.hash(getGuid(), getId());

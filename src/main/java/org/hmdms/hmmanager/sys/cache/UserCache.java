@@ -122,6 +122,11 @@ public abstract class UserCache extends Cache {
         return result;
     }
 
+    /**
+     * Initializes {@link UserCache#users} by first calling {@link UserCache#initLocks()} and then
+     * calling {@link UserCache#cacheUsers()}.
+     * @throws CachingException If something went wrong
+     */
     public static void initCache() throws CachingException {
         logger.debug("Initializing UserCache");
 
@@ -130,15 +135,19 @@ public abstract class UserCache extends Cache {
         logger.debug("UserCache successfully initialized");
     }
 
+    /**
+     * Initializes user cache asynchronously by submitting {@link UserCache#cacheUsers()} to
+     * {@link UserCache#ex}
+     * @return
+     */
     public static @NotNull Future<Boolean> initCachesAsync() {
         initLocks();
 
         return ex.submit(() -> {
             Future<Boolean> users = ex.submit(UserCache::cacheUsers);
-            Future<Boolean> tickets = ex.submit(UserCache::cacheTickets);
 
             try {
-                while (!users.isDone() && !tickets.isDone()) {
+                while (!users.isDone()) {
                     logger.trace("Loading configs...");
                     //noinspection BusyWait
                     Thread.sleep(50);
@@ -147,10 +156,13 @@ public abstract class UserCache extends Cache {
                 LoggingUtils.logException(e, logger);
                 throw new RuntimeException(e);
             }
-            return users.get() && tickets.get();
+            return users.get();
         });
     }
 
+    /**
+     * Initializes all {@link ReentrantLock} objects in {@link Cache#locks}
+     */
     private static void initLocks() {
         locks.put("users", new ReentrantLock());
         locks.put("tickets", new ReentrantLock());

@@ -168,6 +168,11 @@ public abstract class ConfigCache extends Cache {
         loadDbConfig();
     }
 
+    /**
+     * Initializes caches asynchronously by submitting {@link ConfigCache#loadSysConfig()} and {@link ConfigCache#loadDbConfig()}
+     * to the executor {@link ConfigCache#ex}
+     * @return Future that results in true, if configs could be loaded, false otherwise
+     */
     public static @NotNull Future<Boolean> initCachesAsync() {
         initLocks();
 
@@ -183,6 +188,9 @@ public abstract class ConfigCache extends Cache {
         });
     }
 
+    /**
+     * Initializes all {@link ReentrantLock} for config objects
+     */
     private static void initLocks() {
         locks.put("sys", new ReentrantLock());
         locks.put("db",  new ReentrantLock());

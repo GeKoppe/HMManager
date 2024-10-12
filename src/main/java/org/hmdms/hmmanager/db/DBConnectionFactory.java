@@ -26,7 +26,6 @@ public abstract class DBConnectionFactory {
      * from the db_config.properties file to connect to the database.
      * @return DBConnection object with an instantiated Connection property which is configured to access the
      * applications own database
-     * @throws IOException Thrown when an exception occurs during the read of the db_config.properties file
      */
     @Contract(" -> new")
     public static @NotNull DBConnection newDefaultConnection() {

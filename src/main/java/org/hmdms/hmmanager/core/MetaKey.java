@@ -48,22 +48,44 @@ public class MetaKey implements IFillable, Serializable {
         this.name = name;
     }
 
+    /**
+     * Returns the name of the MetaKey
+     * @return Name of the MetaKey
+     */
     public String getName() {
         return name;
     }
 
+    /**
+     * Sets name of the MetaKey
+     * @param name Name of the MetaKey to be set
+     */
     public void setName(String name) {
         this.name = name;
     }
 
+    /**
+     * Returns id of the MetaKey
+     * @return id of the MetaKey
+     */
     public int getId() {
         return id;
     }
 
+    /**
+     * Sets id of the MetaKey
+     * @param id Id to be set
+     */
     public void setId(int id) {
         this.id = id;
     }
 
+    /**
+     * {@inheritDoc}
+     * TODO implement
+     * @param rs ResultSet from which to fill the IFillable
+     * @return True, if object could be filled from ResultSet, false otherwise
+     */
     @Override
     public boolean fillFromResultSet(ResultSet rs) {
         return false;

@@ -11,8 +11,14 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 
+/**
+ * Factory class for creating {@link User} objects
+ */
 public abstract class UserFactory {
 
+    /**
+     * Logger
+     */
     private static final Logger logger = LoggerFactory.getLogger(UserFactory.class);
 
     /**

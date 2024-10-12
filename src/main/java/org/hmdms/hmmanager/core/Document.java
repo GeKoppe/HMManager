@@ -12,6 +12,9 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Objects;
 
+/**
+ * Class that represents a document
+ */
 public class Document implements IFillable, Serializable {
     /**
      * Logger
@@ -33,60 +36,121 @@ public class Document implements IFillable, Serializable {
      * ID of the document path this document is in
      */
     private int documentPath;
-
+    /**
+     * File extension of the document
+     */
     private String extension;
+    /**
+     * Date of physical file
+     */
     private Date documentDate;
 
+    /**
+     * Default constructor
+     */
     public Document() { }
 
+    /**
+     * Returns {@link Document#id} property
+     * @return {@link Document#id} property
+     */
     public String getId() {
         return id;
     }
 
+    /**
+     * Sets {@link Document#id} property of the current object
+     * @param id What {@link Document#id} should be set to
+     */
     public void setId(String id) {
         this.id = id;
     }
 
+    /**
+     * Returns id of the element this document is associated with
+     * @return Id of the element this document is associated with
+     */
     public int getElementId() {
         return elementId;
     }
 
+    /**
+     * Sets the id of the element this document is associated with
+     * @param elementId id of the element this document is associated with
+     */
     public void setElementId(int elementId) {
         this.elementId = elementId;
     }
 
+    /**
+     * Returns version of the document
+     * @return Version of the document
+     */
     public float getVersion() {
         return version;
     }
 
+    /**
+     * Sets version of the document
+     * @param version version of the document
+     */
     public void setVersion(float version) {
         this.version = version;
     }
 
+    /**
+     * Returns id of the document path the physical file lies in
+     * @return id of the document path the physical file lies in
+     */
     public int getDocumentPath() {
         return documentPath;
     }
 
+    /**
+     * Sets id of the path the physical document lies in
+     * @param documentPath id of the path the physical document lies in
+     */
     public void setDocumentPath(int documentPath) {
         this.documentPath = documentPath;
     }
 
+    /**
+     * Returns extension of this physical document
+     * @return extension of this physical document
+     */
     public String getExtension() {
         return extension;
     }
 
+    /**
+     * Sets extension of the physical document
+     * @param extension extension of the physical document
+     */
     public void setExtension(String extension) {
         this.extension = extension;
     }
 
+    /**
+     * Gets date of the physical document
+     * @return date of the physical document
+     */
     public Date getDocumentDate() {
         return documentDate;
     }
 
+    /**
+     * Sets date of the physical document
+     * @param documentDate date of the physical document
+     */
     public void setDocumentDate(Date documentDate) {
         this.documentDate = documentDate;
     }
 
+    /**
+     * {@inheritDoc}
+     * @param o Object to be checked for equality with this document
+     * @return True, if o and this document are equal
+     */
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -94,11 +158,19 @@ public class Document implements IFillable, Serializable {
         return getElementId() == document.getElementId() && Float.compare(getVersion(), document.getVersion()) == 0 && getDocumentPath() == document.getDocumentPath() && Objects.equals(getId(), document.getId()) && Objects.equals(getExtension(), document.getExtension());
     }
 
+    /**
+     * {@inheritDoc}
+     * @return
+     */
     @Override
     public int hashCode() {
         return Objects.hash(getId(), getElementId(), getVersion(), getDocumentPath(), getExtension());
     }
 
+    /**
+     * {@inheritDoc}
+     * @return
+     */
     @Override
     public String toString() {
         return "Document{" +

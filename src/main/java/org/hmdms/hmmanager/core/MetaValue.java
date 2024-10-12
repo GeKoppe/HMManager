@@ -19,18 +19,34 @@ public class MetaValue extends MetaKey {
      */
     private String value;
 
+    /**
+     * Default constructor
+     */
     public MetaValue() {
         super();
     }
 
+    /**
+     * Returns value of this object
+     * @return Value of this MetaValue
+     */
     public String getValue() {
         return value;
     }
 
+    /**
+     * Sets Value of this MetaValue
+     * @param value Value of this MetaValue
+     */
     public void setValue(String value) {
         this.value = value;
     }
 
+    /**
+     * {@inheritDoc}
+     * @param o
+     * @return
+     */
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -38,11 +54,19 @@ public class MetaValue extends MetaKey {
         return Objects.equals(getValue(), metaValue.getValue());
     }
 
+    /**
+     * {@inheritDoc}
+     * @return
+     */
     @Override
     public int hashCode() {
         return Objects.hash(getValue());
     }
 
+    /**
+     * {@inheritDoc}
+     * @return
+     */
     @Override
     public String toString() {
         return "MetaValue{" +
